@@ -1,6 +1,6 @@
 # IIOSH Research Automation
 
-Automated research monitoring pipeline for the **Israel Institute for Occupational Safety and Hygiene (IIOSH)**. Tracks new academic publications across 39 target journals in occupational health, safety, ergonomics, and related fields — then delivers insights via a weekly newsletter ([Example] (https://tamirs-osh.github.io/OSH_Research/IIOSH_Research_Update_2026-06-25.html)) and a live [Dashboard](https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2).
+Automated research monitoring pipeline for the **Israel Institute for Occupational Safety and Hygiene (IIOSH)**. Tracks new academic publications across 39 target journals in occupational health, safety, ergonomics, and related fields — then delivers insights via a weekly newsletter ([Example](https://tamirs-osh.github.io/OSH_Research/IIOSH_Research_Update_2026-06-25.html)) and a live [Dashboard](https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2).
 
 ## What It Does
 
