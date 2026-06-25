@@ -1,3 +1,15 @@
-ירחונים לסקירה שוטפת מה חדש בתחומינו.docx
+# Sensitive files
+credentials.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Generated outputs
+IIOSH_Research_Update_*.html
 IIOSH_V2_copy.html
+
+# Local files
 Experiments.ipynb
+ירחונים לסקירה שוטפת מה חדש בתחומינו.docx

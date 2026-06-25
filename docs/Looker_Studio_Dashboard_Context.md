@@ -10,9 +10,9 @@ The goal of this dashboard is to provide the IIOSH research team with a centrali
 ## 📊 Looker Studio Architecture
 
 ### 1. Data Source Workflow
-* **Backend:** A Python script queries the **OpenAlex API** globally for new publications using standard journal ISSNs.
-* **Storage:** The raw metadata (Title, Journal Name, DOI Link, Publication Date, Subject Domain, and Journal Quality Grade) is appended to a central tracking storage layer (e.g., CSV / Google Sheets).
-* **Visualization:** Looker Studio connects directly to this storage layer as its live data source.
+* **Backend:** A Python script (`dashboard/scraper.py`) queries the **OpenAlex API** globally for new publications using standard journal ISSNs.
+* **Storage:** The raw metadata (Title, Journal Name, DOI Link, Publication Date, Subject Domain, and Journal Quality Grade) is pushed to the "IIOSH Dashboard Data" Google Sheet.
+* **Visualization:** Looker Studio connects directly to this Google Sheet as its live data source.
 
 ### 2. Embedded Fields & Data Schema
 The underlying data table fed into Looker Studio contains the following structured fields:
@@ -40,9 +40,14 @@ To prevent information overload, the dashboard relies heavily on active user con
 
 ---
 
+## 📂 scripts_archive/
+The `scripts_archive/` folder contains old, superseded scripts kept in the repo for reference. These are **not** part of any active pipeline. They include earlier versions of the scraper (daily and weekly variants using `gspread.oauth()`), a one-off journal metadata uploader, and an HTML CSS redesigner.
+
+---
+
 ## 🔄 Relationship to the Weekly Newsletter Script
 While the **Looker Studio Dashboard** acts as the permanent, searchable *historical archive* for the institute, it runs side-by-side with an automated **Weekly Newsletter Script**. 
-* The script aggressively pulls data from the last 7 days, utilizes **Gemini 2.5-flash-lite** to extract results-oriented 2-sentence English summaries from abstracts, and exports an HTML layout.
+* The script aggressively pulls data from the last 7 days, utilizes **Gemini 3.1-flash-lite** to extract results-oriented 2-sentence English summaries from abstracts, and exports an HTML layout.
 * The Looker Studio dashboard acts as the deep-dive backup when researchers want to look back further than the 7-day email window.
 
 
@@ -67,22 +72,14 @@ While the **Looker Studio Dashboard** acts as the permanent, searchable *histori
 [x] Sheet Permissions: Granted the Service Account email explicit Editor access to the "IIOSH Dashboard Data" Google Sheet.
 
 ✅ Phase 3: GitHub Actions Setup (Completed)
-[x] Workflow File (weekly_update.yml): Drafted the YAML file to run automatically every Monday at midnight UTC and manually on demand.
+[x] Workflow File (weekly_update.yml): Drafted the YAML file to run automatically every Sunday at 08:00 UTC and manually on demand.
 
 [x] OIDC Permissions: Added the critical id-token: write and contents: read permissions to the YAML job.
 
 [x] Auth Step Added: Integrated the google-github-actions/auth@v2 step into the pipeline using the WIF provider string and Service Account email.
 
-⏳ Phase 4: Final Action Items (Pending)
-We are at the finish line. To complete the automation, you need to execute these final steps in your repository:
-
-[ ] Commit Files: Push the following three files to your GitHub repository:
-
-scraper.py (The updated Python script)
-
-requirements.txt (Containing: requests, pandas, gspread, google-auth)
-
-.github/workflows/weekly_update.yml (The GitHub Actions configuration)
+✅ Phase 4: Deployment (Completed)
+[x] Commit Files: Pushed dashboard/scraper.py, dashboard/requirements.txt, and .github/workflows/weekly_update.yml to the GitHub repository.
 
 [ ] Test the Action: Go to the Actions tab in your GitHub repository, select the "Weekly Looker Studio Data Pull" workflow, and click Run workflow to test it manually.
 

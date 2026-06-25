@@ -1,14 +1,14 @@
-name: Weekly Looker Studio Data Pull
+name: IIOSH Weekly Automation
 
 on:
   schedule:
-    - cron: '0 8 * * 0' # Runs every Monday at midnight UTC
-  workflow_dispatch:    # Allows manual testing
+    - cron: '0 8 * * 0'
+  workflow_dispatch:
 
 jobs:
   update-dashboard:
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -30,7 +30,48 @@ jobs:
           python-version: '3.10'
 
       - name: Install Dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r dashboard/requirements.txt
 
       - name: Run Data Pipeline
-        run: python scraper.py
+        run: python dashboard/scraper.py
+
+  send-newsletter:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'write'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install -r newsletter/requirements.txt
+
+      - name: Generate Newsletter & Send Email
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_LIST: ${{ secrets.RECIPIENT_LIST }}
+          PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research'
+        run: python newsletter/newsletter.py
+
+      - name: Prepare Pages content
+        run: |
+          mkdir -p pages_output
+          cp IIOSH_Research_Update_*.html pages_output/
+          latest=$(ls -t IIOSH_Research_Update_*.html | head -1)
+          cp "$latest" pages_output/index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages_output
+          keep_files: true
