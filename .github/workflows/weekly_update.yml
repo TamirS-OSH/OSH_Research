@@ -6,34 +6,34 @@ on:
   workflow_dispatch:
 
 jobs:
-  # update-dashboard:
-  #   runs-on: ubuntu-latest
+  update-dashboard:
+    runs-on: ubuntu-latest
 
-  #   permissions:
-  #     contents: 'read'
-  #     id-token: 'write'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-  #     - name: Authenticate to Google Cloud
-  #       id: auth
-  #       uses: google-github-actions/auth@v2
-  #       with:
-  #         workload_identity_provider: 'projects/142538704961/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
-  #         service_account: 'journal-dashboard-bot@research-497406.iam.gserviceaccount.com'
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/142538704961/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
+          service_account: 'journal-dashboard-bot@research-497406.iam.gserviceaccount.com'
 
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-  #     - name: Install Dependencies
-  #       run: pip install -r dashboard/requirements.txt
+      - name: Install Dependencies
+        run: pip install -r dashboard/requirements.txt
 
-  #     - name: Run Data Pipeline
-  #       run: python dashboard/scraper.py
+      - name: Run Data Pipeline
+        run: python dashboard/scraper.py
 
   send-newsletter:
     runs-on: ubuntu-latest
@@ -58,7 +58,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          RECIPIENT_LIST: "Tamirs@osh.org.il"
+          RECIPIENT_LIST: ${{ secrets.RECIPIENT_LIST }}
           PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research'
         run: python newsletter/newsletter.py
 
