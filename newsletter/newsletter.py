@@ -426,21 +426,26 @@ def send_email(subject, html_body, recipients):
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
-    data_payload, meta_brief = fetch_and_summarize()
-    html_content, filename = generate_local_html(data_payload, meta_brief)
+    print("🚀 RUNNING LIGHTNING VISUAL TEST - SKIPPING AI & SCRAPING...")
+    
+    # 1. Create fake dummy text instead of running the AI
+    dummy_meta = {
+        "en": "This is a lightning test of the email layout. The buttons below should be blue and dark green. The AI summary will return in the real run.",
+        "he": "זוהי בדיקה מהירה של פריסת המייל. הכפתורים למטה צריכים להיות כחול וירוק כהה."
+    }
+    
+    # 2. Fake the page URL
+    page_url = f"{PAGE_BASE_URL}/test_layout.html"
+    
+    # 3. Build the email
+    email_body = build_email_body(dummy_meta, page_url)
 
-    if html_content and filename:
-        page_url = f"{PAGE_BASE_URL}/{filename}"
-        email_body = build_email_body(meta_brief, page_url)
+    # 4. Fetch the test recipient from your YAML
+    recipient_str = os.environ.get("RECIPIENT_LIST", "")
+    recipients = [r.strip() for r in recipient_str.split(",") if r.strip()]
 
-        recipient_str = os.environ.get("RECIPIENT_LIST", "")
-        recipients = [r.strip() for r in recipient_str.split(",") if r.strip()]
-
-        if recipients:
-            send_email(
-                "IIOSH Weekly Research Update | לקט מחקרים שבועי",
-                email_body,
-                recipients
-            )
-        else:
-            print("No recipients configured. Skipping email send.")
+    # 5. Send it immediately
+    if recipients:
+        send_email("VISUAL TEST: IIOSH Newsletter Layout", email_body, recipients)
+    else:
+        print("No recipients found.")
