@@ -366,6 +366,7 @@ def generate_local_html(newsletter_data, global_meta):
 
 
 # --- 5. EMAIL DISTRIBUTION ---
+# --- 5. EMAIL DISTRIBUTION ---
 def build_email_body(global_meta, page_url):
     en_text = re.sub(
         r"href=['\"]#(art-\d+)['\"]",
@@ -390,9 +391,9 @@ def build_email_body(global_meta, page_url):
     </div>
 
     <div style="text-align: center; margin: 30px 0;">
-        <a href="{page_url}" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #2563eb; text-decoration: none; border: 2px solid #2563eb; border-radius: 6px; font-weight: 700; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Read the Full Update &#8594;  &#8592; לקריאת הסקירה המלאה</a>
+        <a href="{page_url}" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #2563eb; text-decoration: none; border: 2px solid #2563eb; border-radius: 6px; font-weight: 700; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Read the Full Update / לקריאת הסקירה המלאה</a>
         <br><br>
-        <a href="https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #15803d; text-decoration: none; border: 2px solid #15803d; border-radius: 6px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Check the literature dashboard  לבדיקת דשבורד הספרות המחקרית</a>
+        <a href="https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #15803d; text-decoration: none; border: 2px solid #15803d; border-radius: 6px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Check the literature dashboard / לבדיקת דשבורד הספרות המחקרית</a>
     </div>
 
     <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 30px;">
