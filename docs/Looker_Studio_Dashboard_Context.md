@@ -72,7 +72,7 @@ While the **Looker Studio Dashboard** acts as the permanent, searchable *histori
 [x] Sheet Permissions: Granted the Service Account email explicit Editor access to the "IIOSH Dashboard Data" Google Sheet.
 
 ✅ Phase 3: GitHub Actions Setup (Completed)
-[x] Workflow File (weekly_update.yml): Drafted the YAML file to run automatically every Sunday at 08:00 UTC and manually on demand.
+[x] Workflow File (weekly_update.yml): Drafted the YAML file to run on demand via workflow_dispatch (and, originally, a weekly cron schedule — since removed; see Phase 5).
 
 [x] OIDC Permissions: Added the critical id-token: write and contents: read permissions to the YAML job.
 
@@ -84,3 +84,14 @@ While the **Looker Studio Dashboard** acts as the permanent, searchable *histori
 [ ] Test the Action: Go to the Actions tab in your GitHub repository, select the "Weekly Looker Studio Data Pull" workflow, and click Run workflow to test it manually.
 
 [ ] Verify: Check the Looker Studio dashboard to ensure the data updated correctly without errors.
+
+✅ Phase 5: Scheduling Pivot — External Trigger (Completed)
+[x] Root Cause: GitHub Actions' native `schedule:` (cron) trigger never fired for this repo — confirmed by a diagnostic test showing 0 schedule-event runs across multiple clean cron ticks, despite a valid, active workflow on the default branch. Manual `workflow_dispatch` runs always worked, so the pipeline code was never the problem.
+
+[x] External Scheduler: Built a Google Apps Script project (`IIOSH Weekly Trigger`) with a time-driven Week-timer trigger (Sunday morning, Israel time) that POSTs to GitHub's `workflow_dispatch` API using a fine-grained PAT stored in Script Properties. (Cloud Scheduler was ruled out — it requires billing enabled on the org's GCP project.)
+
+[x] Verification: Confirmed the full chain end-to-end (manual run + an unattended one-time trigger both fired the workflow successfully via the API).
+
+[x] Cleanup: Removed the dead `schedule:` line from `weekly_update.yml`, leaving only `workflow_dispatch:`, so Apps Script is the single source of truth and there is no duplicate-send risk.
+
+[!] Maintenance Watch: The fine-grained PAT expires (~1 year max). When it does, the trigger fails silently and the newsletter/dashboard stop updating. Enable the Apps Script trigger's failure-notification email and regenerate the token before expiry. See the README's *Scheduling* section for full details.

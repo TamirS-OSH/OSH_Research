@@ -11,6 +11,8 @@ The Israel Institute for Occupational Safety and Hygiene (IIOSH) utilizes an aut
     * *Note:* The `flash-lite` model is currently in use. If RTL Hebrew token load causes frequent `429 Resource Exhausted` errors, consider upgrading to the heavier `flash` variant.
 * **Language:** Python 3.x
 * **Output:** Standalone HTML file with inline CSS.
+* **Execution:** GitHub Actions (`.github/workflows/weekly_update.yml`).
+* **Scheduling:** Triggered **externally** by a Google Apps Script time-driven trigger (Sunday morning, Israel time) that calls GitHub's `workflow_dispatch` API. GitHub Actions' native `schedule:` cron was removed because it never fired for this repo — see the README's *Scheduling* section for the full mechanism and token-maintenance notes.
 
 ---
 
