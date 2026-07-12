@@ -1,38 +1,19 @@
 name: IIOSH Weekly Automation
 
+# ==========================================================================
+# TEMPORARY PREVIEW CONFIG (branch: feature/tiered-grade-fallback)
+# This is NOT the production workflow. It runs the real newsletter fetch to
+# validate the tiered Q1->Q1/Q2+Q2 fallback + grade badges, but:
+#   - the update-dashboard job is removed (does not touch the live dashboard)
+#   - GMAIL_APP_PASSWORD and RECIPIENT_LIST are omitted -> NO EMAIL is sent
+#   - output is published to the /preview subpath (live root site untouched)
+# This file MUST be reverted to the production version before merging to main.
+# ==========================================================================
+
 on:
   workflow_dispatch:
 
 jobs:
-  update-dashboard:
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Authenticate to Google Cloud
-        id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: 'projects/142538704961/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
-          service_account: 'journal-dashboard-bot@research-497406.iam.gserviceaccount.com'
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install Dependencies
-        run: pip install -r dashboard/requirements.txt
-
-      - name: Run Data Pipeline
-        run: python dashboard/scraper.py
-
   send-newsletter:
     runs-on: ubuntu-latest
 
@@ -51,17 +32,16 @@ jobs:
       - name: Install Dependencies
         run: pip install -r newsletter/requirements.txt
 
-      - name: Generate Newsletter & Send Email
+      - name: Generate Newsletter (NO EMAIL)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          RECIPIENT_LIST: ${{ secrets.RECIPIENT_LIST }}
-          PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research'
-          # Contact email for OpenAlex "polite pool" (reuses existing secret).
+          # Reuse the contact email for OpenAlex "polite pool". This is only an
+          # address, not a credential, so it cannot trigger an email send.
           OPENALEX_MAILTO: ${{ secrets.GMAIL_USER }}
-          # Stream Python output live so [DIAG] lines are timestamped correctly.
+          PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research/preview'
           PYTHONUNBUFFERED: '1'
+          # GMAIL_APP_PASSWORD and RECIPIENT_LIST intentionally NOT set ->
+          # send_email() short-circuits and the __main__ block skips sending.
         run: python newsletter/newsletter.py
 
       - name: Prepare Pages content
@@ -70,7 +50,7 @@ jobs:
           shopt -s nullglob
           files=(IIOSH_Research_Update_*.html)
           if [ ${#files[@]} -eq 0 ]; then
-            echo "::warning::No newsletter HTML produced (0 articles fetched). Skipping publish. Check the [DIAG] lines in the newsletter step for OpenAlex HTTP statuses."
+            echo "::warning::No newsletter HTML produced (0 articles fetched). Check [DIAG] lines."
             echo "produced=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -79,11 +59,33 @@ jobs:
           latest=$(ls -t IIOSH_Research_Update_*.html | head -1)
           cp "$latest" pages_output/index.html
           echo "produced=true" >> "$GITHUB_OUTPUT"
+          echo "file=$latest" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy preview to GitHub Pages
         if: steps.prep.outputs.produced == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./pages_output
+          destination_dir: preview
           keep_files: true
+
+      - name: Report preview link
+        if: always()
+        run: |
+          if [ "${{ steps.prep.outputs.produced }}" == "true" ]; then
+            {
+              echo "### ✅ Preview published"
+              echo ""
+              echo "[Open the preview page](https://tamirs-osh.github.io/OSH_Research/preview/)"
+              echo ""
+              echo "\`index.html\` = latest generated file (\`${{ steps.prep.outputs.file }}\`)."
+              echo "Look for the coloured grade pills on each article card and check whether thin domains widened to Q1/Q2 + Q2."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ⚠️ No articles produced this run"
+              echo ""
+              echo "Nothing to preview. Check the \`[DIAG]\` lines in the newsletter step for OpenAlex HTTP statuses and per-domain counts."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
