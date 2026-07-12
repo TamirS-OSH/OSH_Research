@@ -58,16 +58,30 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_LIST: ${{ secrets.RECIPIENT_LIST }}
           PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research'
+          # Contact email for OpenAlex "polite pool" (reuses existing secret).
+          OPENALEX_MAILTO: ${{ secrets.GMAIL_USER }}
+          # Stream Python output live so [DIAG] lines are timestamped correctly.
+          PYTHONUNBUFFERED: '1'
         run: python newsletter/newsletter.py
 
       - name: Prepare Pages content
+        id: prep
         run: |
+          shopt -s nullglob
+          files=(IIOSH_Research_Update_*.html)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::No newsletter HTML produced (0 articles fetched). Skipping publish. Check the [DIAG] lines in the newsletter step for OpenAlex HTTP statuses."
+            echo "produced=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           mkdir -p pages_output
           cp IIOSH_Research_Update_*.html pages_output/
           latest=$(ls -t IIOSH_Research_Update_*.html | head -1)
           cp "$latest" pages_output/index.html
+          echo "produced=true" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to GitHub Pages
+        if: steps.prep.outputs.produced == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
