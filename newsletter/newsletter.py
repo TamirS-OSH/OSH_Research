@@ -18,6 +18,13 @@ MAX_ARTICLES_PER_SUBJECT = 5
 # Calculate the date 7 days ago (Weekly Roundup)
 RECENT_DATE = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
+# OpenAlex politeness: supplying a contact email puts us in the faster, more
+# reliable "polite pool" (far less likely to be rate-limited on shared CI IPs).
+OPENALEX_MAILTO = os.environ.get("OPENALEX_MAILTO", "").strip()
+REQUEST_HEADERS = {
+    "User-Agent": f"IIOSH-Research-Newsletter/1.0 (mailto:{OPENALEX_MAILTO or 'contact-unset'})"
+}
+
 # Initialize Gemini Client
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -65,6 +72,43 @@ JOURNAL_MAPPING = {
 }
 
 # --- 2. HELPER FUNCTIONS ---
+def fetch_openalex(url, issn, subject, max_retries=4):
+    """GET an OpenAlex URL with retry/backoff. Returns a 200 Response or None.
+
+    Logs every attempt with a [DIAG] prefix so failures are traceable in the
+    CI logs (HTTP status + result count, plus the response body on non-200).
+    Retries transient failures (429 Too Many Requests, 5xx) with exponential
+    backoff, honoring a Retry-After header when present.
+    """
+    backoff = 5
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = requests.get(url, headers=REQUEST_HEADERS, timeout=20)
+        except Exception as e:
+            print(f"[DIAG] ISSN {issn} ({subject}) attempt {attempt}/{max_retries} -> EXCEPTION: {e}", flush=True)
+            if attempt == max_retries:
+                return None
+            time.sleep(backoff)
+            backoff *= 2
+            continue
+
+        n = len(resp.json().get('results', [])) if resp.status_code == 200 else 0
+        print(f"[DIAG] ISSN {issn} ({subject}) attempt {attempt}/{max_retries} -> HTTP {resp.status_code}, {n} results", flush=True)
+
+        if resp.status_code == 200:
+            return resp
+
+        print(f"[DIAG]   non-200 body (first 300 chars): {resp.text[:300]}", flush=True)
+        if resp.status_code in (429, 500, 502, 503, 504) and attempt < max_retries:
+            retry_after = resp.headers.get("Retry-After", "")
+            wait = int(retry_after) if retry_after.isdigit() else backoff
+            print(f"[DIAG]   transient status, retrying in {wait}s...", flush=True)
+            time.sleep(wait)
+            backoff *= 2
+            continue
+        return None
+    return None
+
 def unscramble_abstract(inverted_index):
     if not inverted_index:
         return None
@@ -221,13 +265,14 @@ def fetch_and_summarize():
             continue
             
         url = f"https://api.openalex.org/works?filter=primary_location.source.issn:{issn},from_publication_date:{RECENT_DATE}&sort=publication_date:desc&per_page=15"
-        
-        try:
-            response = requests.get(url, timeout=15)
-        except Exception as e:
-            print(f"Network error fetching ISSN {issn}: {e}. Skipping.")
+        if OPENALEX_MAILTO:
+            url += f"&mailto={OPENALEX_MAILTO}"
+
+        response = fetch_openalex(url, issn, subject)
+        if response is None:
+            print(f"   ⚠️ Gave up on ISSN {issn} ({subject}) after retries. Skipping.", flush=True)
             continue
-            
+
         if response.status_code == 200:
             results = response.json().get('results', [])
             
