@@ -247,23 +247,22 @@ def synthesize_global_meta_briefing(all_articles):
     return {"en": "Global trends summary unavailable.", "he": "תקציר מגמות אינו זמין."}
 
 # --- 3. FETCHING AND PROCESSING ---
-def fetch_and_summarize():
-    print(f"Starting bilingual weekly data pull (Q1 Journals & Max {MAX_ARTICLES_PER_SUBJECT} per category)...")
-    print(f"Fetching articles published since {RECENT_DATE}...\n")
-    
-    newsletter_data = {}
-    flat_articles_list = []
-    total_articles_processed = 0
-    
-    for issn, journal_info in JOURNAL_MAPPING.items():
-        if journal_info["Grade"] != "Q1":
-            continue
-            
-        subject = journal_info["Subject"]
-        
-        if subject in newsletter_data and len(newsletter_data[subject]["articles"]) >= MAX_ARTICLES_PER_SUBJECT:
-            continue
-            
+# When a domain yields this many usable Q1 articles or fewer, widen the search
+# to also include that domain's Q1/Q2 and Q2 journals.
+FALLBACK_THRESHOLD = 2
+
+
+def gather_candidates(journal_entries, subject):
+    """Fetch + extract displayable article candidates from a list of journals.
+
+    journal_entries: list of (issn, grade) tuples to query, in priority order.
+    Returns candidate dicts (title/journal/link/abstract/grade) preserving order.
+    A candidate must have a usable abstract to count — that is the same gate the
+    display uses. AI summarization is deliberately deferred to the caller so we
+    don't spend Gemini calls on articles that end up trimmed by the per-domain cap.
+    """
+    candidates = []
+    for issn, grade in journal_entries:
         url = f"https://api.openalex.org/works?filter=primary_location.source.issn:{issn},from_publication_date:{RECENT_DATE}&sort=publication_date:desc&per_page=15"
         if OPENALEX_MAILTO:
             url += f"&mailto={OPENALEX_MAILTO}"
@@ -273,45 +272,78 @@ def fetch_and_summarize():
             print(f"   ⚠️ Gave up on ISSN {issn} ({subject}) after retries. Skipping.", flush=True)
             continue
 
-        if response.status_code == 200:
-            results = response.json().get('results', [])
-            
-            if results and subject not in newsletter_data:
-                newsletter_data[subject] = {"domain_summary_en": "", "domain_summary_he": "", "articles": []}
-                
-            for work in results:
-                if len(newsletter_data[subject]["articles"]) >= MAX_ARTICLES_PER_SUBJECT:
-                    print(f"   ⏭️ Cap of {MAX_ARTICLES_PER_SUBJECT} reached for category '{subject}'. Moving to next category.")
-                    break
-                    
-                title = work.get('title', 'Untitled')
-                journal_name = work.get('primary_location', {}).get('source', {}).get('display_name', 'Unknown Journal')
-                link = work.get('doi', work.get('id'))
-                
-                raw_abstract = unscramble_abstract(work.get('abstract_inverted_index'))
-                
-                if raw_abstract:
-                    article_id = f"art-{total_articles_processed + 1}"
-                    print(f"[{total_articles_processed + 1}] Processing ({subject}): {title[:40]}...")
-                    bilingual_summaries = summarize_with_ai(title, raw_abstract)
-                    
-                    article_node = {
-                        "id": article_id,
-                        "title": title,
-                        "journal": journal_name,
-                        "link": link,
-                        "summary_en": bilingual_summaries["en"],
-                        "summary_he": bilingual_summaries["he"]
-                    }
-                    
-                    newsletter_data[subject]["articles"].append(article_node)
-                    flat_articles_list.append(article_node)
-                    
-                    total_articles_processed += 1
-                    time.sleep(12)  
-                    
+        for work in response.json().get('results', []):
+            raw_abstract = unscramble_abstract(work.get('abstract_inverted_index'))
+            if not raw_abstract:
+                continue
+            candidates.append({
+                "title": work.get('title', 'Untitled'),
+                "journal": work.get('primary_location', {}).get('source', {}).get('display_name', 'Unknown Journal'),
+                "link": work.get('doi', work.get('id')),
+                "abstract": raw_abstract,
+                "grade": grade,
+            })
         time.sleep(3)
-    
+    return candidates
+
+
+def fetch_and_summarize():
+    print(f"Starting bilingual weekly data pull (tiered Q1 -> Q1/Q2+Q2 fallback, Max {MAX_ARTICLES_PER_SUBJECT} per category)...")
+    print(f"Fetching articles published since {RECENT_DATE}...\n")
+
+    # Group journals by subject (preserving first-seen order) and split into a
+    # primary Q1 tier and a fallback tier (Q1/Q2 ahead of pure Q2).
+    subjects_order = []
+    tier1, tier2 = {}, {}
+    for issn, info in JOURNAL_MAPPING.items():
+        subject, grade = info["Subject"], info["Grade"]
+        if subject not in tier1:
+            subjects_order.append(subject)
+            tier1[subject], tier2[subject] = [], []
+        (tier1 if grade == "Q1" else tier2)[subject].append((issn, grade))
+    for subject in tier2:
+        tier2[subject].sort(key=lambda e: 0 if e[1] == "Q1/Q2" else 1)
+
+    newsletter_data = {}
+    flat_articles_list = []
+    total_articles_processed = 0
+
+    for subject in subjects_order:
+        print(f"\n--- Domain: {subject} ---")
+        candidates = gather_candidates(tier1[subject], subject)
+        print(f"[DIAG] Domain '{subject}': {len(candidates)} usable Q1 article(s).", flush=True)
+
+        if len(candidates) <= FALLBACK_THRESHOLD and tier2[subject]:
+            print(f"[DIAG] Domain '{subject}' at/under threshold ({FALLBACK_THRESHOLD}); widening to Q1/Q2 + Q2.", flush=True)
+            candidates += gather_candidates(tier2[subject], subject)
+        elif len(candidates) <= FALLBACK_THRESHOLD:
+            print(f"[DIAG] Domain '{subject}' at/under threshold but has no lower-graded journals to fall back to.", flush=True)
+
+        selected = candidates[:MAX_ARTICLES_PER_SUBJECT]
+        if not selected:
+            continue
+
+        newsletter_data[subject] = {"domain_summary_en": "", "domain_summary_he": "", "articles": []}
+        for cand in selected:
+            total_articles_processed += 1
+            article_id = f"art-{total_articles_processed}"
+            print(f"[{total_articles_processed}] Processing ({subject}) [{cand['grade']}]: {cand['title'][:40]}...")
+            bilingual_summaries = summarize_with_ai(cand["title"], cand["abstract"])
+
+            article_node = {
+                "id": article_id,
+                "title": cand["title"],
+                "journal": cand["journal"],
+                "grade": cand["grade"],
+                "link": cand["link"],
+                "summary_en": bilingual_summaries["en"],
+                "summary_he": bilingual_summaries["he"],
+            }
+
+            newsletter_data[subject]["articles"].append(article_node)
+            flat_articles_list.append(article_node)
+            time.sleep(12)
+
     print("\n" + "="*40)
     print("🧠 Generating Bilingual Category Executive Overviews...")
     print("="*40)
@@ -332,6 +364,22 @@ def fetch_and_summarize():
     return newsletter_data, global_meta_briefing
 
 # --- 4. LOCAL HTML GENERATION ---
+def grade_badge_html(grade):
+    """Return a small coloured pill showing the journal's quartile grade."""
+    palette = {
+        "Q1":    ("#dbeafe", "#1d4ed8", "#1e3a8a"),  # blue
+        "Q1/Q2": ("#cffafe", "#0e7490", "#155e75"),  # cyan (hybrid)
+        "Q2":    ("#fef3c7", "#b45309", "#92400e"),  # amber
+    }
+    bg, border, text = palette.get(grade, ("#f1f5f9", "#94a3b8", "#475569"))
+    return (
+        f"<span title=\"Journal quartile ranking\" style=\"display: inline-block; "
+        f"padding: 3px 11px; background-color: {bg}; border: 1px solid {border}; "
+        f"color: {text}; border-radius: 999px; font-size: 11px; font-weight: 800; "
+        f"letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap;\">{grade}</span>"
+    )
+
+
 def generate_local_html(newsletter_data, global_meta):
     if not newsletter_data:
         print("No new articles to generate this week.")
@@ -351,7 +399,7 @@ def generate_local_html(newsletter_data, global_meta):
             <p dir="rtl" style="margin: 0; text-align: right; font-weight: 500; font-size: 15px; line-height: 1.7;">{global_meta['he']}</p>
         </div>
         
-        <p style="color: #475569; font-size: 15px; margin-bottom: 30px;">Here are the top discoveries published in high-impact Q1 journals over the past 7 days, categorized by subject domain:</p>
+        <p style="color: #475569; font-size: 15px; margin-bottom: 30px;">Here are the top discoveries published in high-impact journals over the past 7 days &mdash; primarily Q1, widening to Q1/Q2 and Q2 where weekly coverage is thin &mdash; categorized by subject domain. Each article is tagged with its journal quartile ranking:</p>
     """
     
     for subject, domain_data in newsletter_data.items():
@@ -384,8 +432,11 @@ def generate_local_html(newsletter_data, global_meta):
                 
                 <p style="margin: 0 0 14px 0; font-size: 14.5px; color: #334155; text-align: justify;">{article['summary_en']}</p>
                 <p dir="rtl" style="margin: 0 0 18px 0; font-size: 14.5px; color: #1e293b; text-align: right; line-height: 1.6;">{article['summary_he']}</p>
-                
-                <a href="{article['link']}" style="color: #2563eb; text-decoration: none; font-weight: 700; font-size: 13.5px; display: inline-block;">[Read Full Article]</a>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                    <a href="{article['link']}" style="color: #2563eb; text-decoration: none; font-weight: 700; font-size: 13.5px; display: inline-block;">[Read Full Article]</a>
+                    {grade_badge_html(article.get('grade', ''))}
+                </div>
             </div>
             """
             
