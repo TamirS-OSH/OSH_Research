@@ -1,0 +1,87 @@
+name: Preview Test (tiered fallback)
+
+# Temporary branch-only workflow to validate the tiered Q1->Q1/Q2+Q2 fallback
+# and the grade badges against live OpenAlex data.
+# It runs the REAL newsletter generation but deliberately omits GMAIL_APP_PASSWORD
+# and RECIPIENT_LIST, so NO EMAIL is ever sent. Output is published to the
+# /preview subpath of GitHub Pages (the live root site is untouched).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  send-newsletter:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'write'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install -r newsletter/requirements.txt
+
+      - name: Generate Newsletter (NO EMAIL)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Reuse the contact email for OpenAlex "polite pool". This is only an
+          # address, not a credential, so it cannot trigger an email send.
+          OPENALEX_MAILTO: ${{ secrets.GMAIL_USER }}
+          PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research/preview'
+          PYTHONUNBUFFERED: '1'
+          # GMAIL_APP_PASSWORD and RECIPIENT_LIST are intentionally NOT set ->
+          # send_email() short-circuits and the __main__ block skips sending.
+        run: python newsletter/newsletter.py
+
+      - name: Prepare Pages content
+        id: prep
+        run: |
+          shopt -s nullglob
+          files=(IIOSH_Research_Update_*.html)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::No newsletter HTML produced (0 articles fetched). Check [DIAG] lines."
+            echo "produced=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p pages_output
+          cp IIOSH_Research_Update_*.html pages_output/
+          latest=$(ls -t IIOSH_Research_Update_*.html | head -1)
+          cp "$latest" pages_output/index.html
+          echo "produced=true" >> "$GITHUB_OUTPUT"
+          echo "file=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy preview to GitHub Pages
+        if: steps.prep.outputs.produced == 'true'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages_output
+          destination_dir: preview
+          keep_files: true
+
+      - name: Report preview link
+        if: always()
+        run: |
+          if [ "${{ steps.prep.outputs.produced }}" == "true" ]; then
+            {
+              echo "### ✅ Preview published"
+              echo ""
+              echo "[Open the preview page](https://tamirs-osh.github.io/OSH_Research/preview/)"
+              echo ""
+              echo "\`index.html\` = latest generated file (\`${{ steps.prep.outputs.file }}\`)."
+              echo "Look for the coloured grade pills on each article card and check whether thin domains widened to Q1/Q2 + Q2."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ⚠️ No articles produced this run"
+              echo ""
+              echo "Nothing to preview. Check the \`[DIAG]\` lines in the newsletter step for OpenAlex HTTP statuses and per-domain counts."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
