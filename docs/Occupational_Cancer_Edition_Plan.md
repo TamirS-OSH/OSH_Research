@@ -297,8 +297,8 @@ Open questions for the first review with her:
 ### 9.7 Content-based theme routing *(proposed)*
 Today an article is filed under whatever theme its journal is assigned to, and is dropped if it does not match that theme. Routing by **content** instead — letting a work-history paper from *SJWEH* land in theme ב rather than being rejected by theme א — would directly implement the cross-listing her document already specifies, and should recover most of the recall lost above without loosening any theme's standard. Needs a tie-break rule for articles matching more than one theme.
 
-### 9.6 `RECIPIENT_LIST_OCC` secret
-Must be created in repo settings before the first run. Absent it, the pipeline generates and publishes the newsletter but skips the send with a logged warning rather than failing.
+### 9.6 RESOLVED — `RECIPIENT_LIST_OCC` secret
+Created and confirmed working: the first live run logged `Email sent successfully to 1 recipients`. Currently points at the maintainer only. **Add the researcher's address once the relevance rule has settled** — probably after the second or third run, keeping the maintainer on the list during tuning.
 
 ---
 
@@ -404,9 +404,13 @@ Finish phase 1 · run the conference signups in parallel right away (no code, im
 5. ~~Add the author feed with its persisted seen-set.~~ **Done** — §6.
 6. ~~Add the `occ_cancer` edition config.~~ **Done.** The `RECIPIENT_LIST_OCC` secret is still outstanding — §9.6.
 7. ~~Add the third workflow job with `needs:` + `sleep 300`.~~ **Done.**
-8. **Next:** create the secret, then trigger one manual run and read the `[KW]` / `[AUTHOR]` / `[DIAG]` lines before letting it go out weekly.
-9. Run 2–3 weeks with full candidate logging; review the rule with the researcher — §9.5.
-10. Update the README once it ships (new edition, `RECIPIENT_LIST_OCC`, `/occ` Pages path, `state/` directory).
+8. ~~Create the secret and trigger one manual run.~~ **Done, 11 Aug 2026.** Ran isolated on the feature branch with `run_dashboard: false`, `run_iiosh: false`, `run_occ: true`. Whole pipeline worked first time — fetch, filter, summarize, bilingual HTML, email, Pages deploy, seen-state commit. It also exposed two filter defects, both since fixed (§5, iterations 3→4).
+9. **Next: a second manual run** on the same settings, to see the per-theme gates against a live week.
+10. Then run 2–3 weeks with full candidate logging and review the rule with the researcher — §9.5. Consider content-based routing — §9.7.
+11. Update the README once it ships (new edition, `RECIPIENT_LIST_OCC`, `/occ` Pages path, `state/` directory, the `workflow_dispatch` inputs).
+
+### Current state — 11 Aug 2026
+Branch `feat/occ-cancer-edition`, 6 commits ahead of `main`, pushed, not yet merged. Nothing is scheduled: the weekly Apps Script trigger fires `main`, which does not yet contain this edition, so no unattended sends can happen while it sits on the branch.
 
 ### Verification status
 
