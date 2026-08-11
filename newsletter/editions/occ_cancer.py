@@ -1,0 +1,272 @@
+"""Occupational cancer research edition.
+
+Built from the researcher's specification (see
+docs/Occupational_Cancer_Edition_Plan.md). 64 journals across 5 themes, graded
+A/B/C, filtered by keyword relevance, plus a tracked-author feed.
+
+Journal ISSNs were resolved against the OpenAlex /sources endpoint and each
+non-exact match was verified by direct ISSN lookup — six of the naive top hits
+were the wrong journal (e.g. "Epidemiology" matched *American Journal of
+Epidemiology*, "Health Services Research" matched *BMC* Health Services
+Research). Comments below record the title each ISSN actually resolves to.
+"""
+
+EDITION = {
+    "slug": "occ_cancer",
+    "file_prefix": "OccCancer_Research_Update",
+    "page_base_url_default": "https://tamirs-osh.github.io/OSH_Research/occ",
+    "recipient_env": "RECIPIENT_LIST_OCC",
+    "email_subject": "Occupational Cancer Research Update | לקט מחקר סרטן תעסוקתי",
+    "email_from_name": "Occupational Cancer Research Update",
+    "title_en": "Occupational Cancer Research Update",
+    "title_he": "לקט מחקר סרטן תעסוקתי",
+    "intro_html": (
+        "New publications from the past 7 days across the tracked journal list "
+        "&mdash; tier A first, widening to tier B &mdash; filtered for topical relevance "
+        "and grouped by research theme. Each article is tagged with its monitoring tier:"
+    ),
+    "badge_tooltip": "Monitoring tier (A = core weekly, B = focused, C = periodic)",
+    "show_dashboard_button": False,
+
+    "max_articles_per_subject": 5,
+
+    # A and B are both queried every week and ranked A-first; the per-theme cap
+    # fills from A before B. C is configured but excluded from the weekly run —
+    # the source doc defines tier C as "periodic or during a targeted search".
+    "selection": {
+        "mode": "ranked",
+        "include": ["A", "B"],
+        "rank_order": ["A", "B", "C"],
+    },
+
+    # Relevance filter. Scored locally on title + abstract BEFORE any Gemini call,
+    # so off-topic papers never consume quota. Without this, broad-scope journals
+    # on the list (Nature Climate Change, Health Affairs, Social Science &
+    # Medicine, The Lancet Public Health) would flood the edition.
+    #
+    # Derived once, by hand, from the 21 lines under "מילות סינון לאלגוריתם" in
+    # the source doc. Comma-lists there were expanded into separate terms rather
+    # than split at runtime, which would be a silent-failure path. Terms are
+    # stored pre-normalised: lowercase, dashes collapsed to spaces.
+    #
+    # Original doc lines, for traceability:
+    #   occupational lung cancer
+    #   lung cancer in never-smokers
+    #   low smoking exposure and occupational carcinogens
+    #   combined, cumulative and sequential occupational exposures
+    #   asbestos, silica, diesel exhaust, PAH, nickel, chromium and welding fumes
+    #   joint effects, additive interaction and multiplicative interaction
+    #   exposure–response, dose–response and cumulative exposure
+    #   latency, time since exposure and time since last exposure
+    #   occupational cancer surveillance after exposure
+    #   occupational disease notification, compensation and recognition
+    #   exposure registries, record retention and administrative data linkage
+    #   industry and occupation in electronic health records
+    #   Occupational Data for Health, EHR, coding and NLP
+    #   job-exposure matrices and occupational exposome
+    #   return to work after cancer
+    #   work ability, work retention and workplace accommodations
+    #   occupational rehabilitation and disability management
+    #   climate change and occupational heat stress
+    #   wildfire smoke, air pollution, UV and extreme weather at work
+    #   occupational exposure limits and regulatory policy
+    #   implementation of occupational health policy
+    #
+    # Terms are split into two classes, because a single flat threshold does not
+    # work on this journal list. Measured over 90 days of real abstracts:
+    #
+    #   rule                        broad journals   focused journals
+    #   score >= 1                        14%              62%
+    #   score >= 2                         2%              13%
+    #   >=1 core, or >=2 total             2%              43%   <-- in use
+    #
+    # A flat score>=1 passed 47% of Nature Climate Change (including a paper on
+    # marine species conservation, matched via "climate change") and a gynecology
+    # paper in Soc Sci & Med via "cumulative exposure". A flat score>=2 fixed that
+    # but discarded obviously relevant work — "Reducing respirable silica exposure
+    # among brick kiln workers", "Characterization of tremolite asbestos".
+    #
+    # CORE: inherently occupational or specific to her research. One match keeps
+    # the article, because these cannot really appear by coincidence.
+    "keywords_core": [
+        "occupational lung cancer",
+        "occupational cancer",
+        "occupational carcinogen",
+        "occupational exposure",
+        "occupational exposure limit",
+        "occupational disease",
+        "occupational exposome",
+        "occupational rehabilitation",
+        "occupational heat",
+        "occupational health policy",
+        "occupational data for health",
+        "never smoker",
+        "asbestos",
+        "silica",
+        "diesel exhaust",
+        "welding fume",
+        "time since exposure",
+        "time since last exposure",
+        "job exposure matrix",
+        "job exposure matrices",
+        "industry and occupation",
+        "exposure registry",
+        "disease notification",
+        "disease recognition",
+        "workers compensation",
+        "return to work",
+        "work ability",
+        "work retention",
+        "workplace accommodation",
+        "cancer survivorship",
+    ],
+    # CONTEXT: real signal, but common enough outside her field that one alone
+    # means little. Needs keyword_min_score matches between them to carry an
+    # article on its own.
+    "keywords_context": [
+        "lung cancer",
+        "carcinogen",
+        "polycyclic aromatic hydrocarbon",
+        "pah",
+        "nickel",
+        "chromium",
+        "hexavalent chromium",
+        "combined exposure",
+        "cumulative exposure",
+        "sequential exposure",
+        "joint effect",
+        "additive interaction",
+        "multiplicative interaction",
+        "exposure response",
+        "dose response",
+        "latency",
+        "exposome",
+        "cancer surveillance",
+        "record linkage",
+        "data linkage",
+        "administrative data",
+        "electronic health record",
+        "ehr",
+        "natural language processing",
+        "disability management",
+        "heat stress",
+        "climate change",
+        "wildfire smoke",
+        "air pollution",
+        "extreme weather",
+        "extreme heat",
+        "exposure limit",
+        "regulatory policy",
+    ],
+    # Context-only articles need this many matches. Core matches bypass it.
+    "keyword_min_score": 2,
+
+    # Standalone section, independent of the journal list, tiers and keyword
+    # filter — it should catch anything she publishes, including in venues that
+    # are not on the list at all.
+    #
+    # Author ID resolved from two DOIs in the doc's own reference list rather
+    # than by name search ("Ann Olsson" returns many OpenAlex candidates); both
+    # resolved to the same ID, ORCID and IARC affiliation.
+    #
+    # NOTE: the OpenAlex author cluster contains historical contamination from
+    # other people named Olsson (its oldest works are 1930s-50s agronomy and
+    # 1980s virology). Recent output is all genuinely hers, so a rolling window
+    # is safe, but never use this ID for a historical query.
+    #
+    # The type/abstract filter matters: of 14 records in a sample 365-day
+    # window, only 5 were real articles — the rest were conference abstracts and
+    # AACR-style "Data from ..." / "Supplementary Figure from ..." companions.
+    "tracked_authors": [
+        {
+            "name": "Ann Olsson",
+            "openalex_id": "A5064971907",
+            "orcid": "0000-0001-6498-2259",
+            "affiliation": "IARC / WHO",
+            # 60 rather than 30: her real cadence is ~5 articles a year (the
+            # section is legitimately absent most weeks), so the window governs
+            # how much OpenAlex indexing lag is tolerated, not how much she sees.
+            # Dedupe makes the extra reach free — nothing is ever shown twice.
+            "window_days": 60,
+            "types": ["article"],
+            "require_abstract": True,
+            "section_title": "Tracked Researcher: Ann Olsson",
+        }
+    ],
+
+    "journals": {
+        # --- Lung Cancer & Occupational Exposures ---
+        "1073-449X": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # American Journal of Respiratory and Critical Care Medicine
+        "0091-6765": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Environmental Health Perspectives
+        "1055-9965": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Cancer Epidemiology Biomarkers & Prevention
+        "1044-3983": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Epidemiology  [corrected: top hit was Am J Epidemiology]
+        "0007-1072": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Occupational and Environmental Medicine
+        "0271-3586": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # American Journal of Industrial Medicine
+        "2398-7308": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Annals of Work Exposures and Health
+        "1559-0631": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Journal of Exposure Science & Environmental Epidemiology
+        "0355-3140": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Scandinavian Journal of Work Environment & Health
+        "1438-4639": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # International Journal of Hygiene and Environmental Health
+        "0340-0131": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # International Archives of Occupational and Environmental Health
+        "1076-2752": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Journal of Occupational and Environmental Medicine
+        "1341-9145": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Journal of Occupational Health  [corrected: top hit was J Occup Health Psychology]
+        "0962-7480": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "A"},  # Occupational Medicine
+        "0169-5002": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "B"},  # Lung Cancer
+        "0040-6376": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "B"},  # Thorax
+        "0903-1936": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "B"},  # European Respiratory Journal
+        "0020-7136": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "B"},  # International Journal of Cancer
+        "1574-7891": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "B"},  # Molecular Oncology
+        "1745-6673": {"Subject": "Lung Cancer & Occupational Exposures", "Grade": "B"},  # Journal of Occupational Medicine and Toxicology
+
+        # --- Occupational Data in Health Records ---
+        "1067-5027": {"Subject": "Occupational Data in Health Records", "Grade": "A"},  # Journal of the American Medical Informatics Association
+        "1532-0464": {"Subject": "Occupational Data in Health Records", "Grade": "A"},  # Journal of Biomedical Informatics
+        "2632-1009": {"Subject": "Occupational Data in Health Records", "Grade": "A"},  # BMJ Health & Care Informatics
+        "1386-5056": {"Subject": "Occupational Data in Health Records", "Grade": "B"},  # International Journal of Medical Informatics
+        "2291-9694": {"Subject": "Occupational Data in Health Records", "Grade": "B"},  # JMIR Medical Informatics
+        "1748-5908": {"Subject": "Occupational Data in Health Records", "Grade": "B"},  # Implementation Science
+        "2379-6146": {"Subject": "Occupational Data in Health Records", "Grade": "B"},  # Learning Health Systems
+        "2399-4908": {"Subject": "Occupational Data in Health Records", "Grade": "B"},  # International Journal for Population Data Science  [doc said "of"; actual title is "for"]
+
+        # --- Return to Work & Rehabilitation ---
+        "1053-0487": {"Subject": "Return to Work & Rehabilitation", "Grade": "A"},  # Journal of Occupational Rehabilitation
+        "1932-2259": {"Subject": "Return to Work & Rehabilitation", "Grade": "A"},  # Journal of Cancer Survivorship
+        "0003-9993": {"Subject": "Return to Work & Rehabilitation", "Grade": "A"},  # Archives of Physical Medicine and Rehabilitation
+        "0269-2155": {"Subject": "Return to Work & Rehabilitation", "Grade": "B"},  # Clinical Rehabilitation
+        "0963-8288": {"Subject": "Return to Work & Rehabilitation", "Grade": "B"},  # Disability and Rehabilitation
+        "1650-1977": {"Subject": "Return to Work & Rehabilitation", "Grade": "B"},  # Journal of Rehabilitation Medicine
+        "0284-186X": {"Subject": "Return to Work & Rehabilitation", "Grade": "B"},  # Acta Oncologica
+        "0941-4355": {"Subject": "Return to Work & Rehabilitation", "Grade": "B"},  # Supportive Care in Cancer
+        "1057-9249": {"Subject": "Return to Work & Rehabilitation", "Grade": "B"},  # Psycho-Oncology
+        "1040-8428": {"Subject": "Return to Work & Rehabilitation", "Grade": "B"},  # Critical Reviews in Oncology/Hematology
+        "1051-9815": {"Subject": "Return to Work & Rehabilitation", "Grade": "C"},  # Work
+
+        # --- Climate Change & Worker Health ---
+        "1758-678X": {"Subject": "Climate Change & Worker Health", "Grade": "A"},  # Nature Climate Change
+        "2542-5196": {"Subject": "Climate Change & Worker Health", "Grade": "A"},  # The Lancet Planetary Health
+        "0959-3780": {"Subject": "Climate Change & Worker Health", "Grade": "A"},  # Global Environmental Change
+        "0160-4120": {"Subject": "Climate Change & Worker Health", "Grade": "A"},  # Environment International
+        "1545-9624": {"Subject": "Climate Change & Worker Health", "Grade": "A"},  # Journal of Occupational and Environmental Hygiene
+        "2093-7911": {"Subject": "Climate Change & Worker Health", "Grade": "A"},  # Safety and Health at Work
+        "0013-9351": {"Subject": "Climate Change & Worker Health", "Grade": "B"},  # Environmental Research
+        "1469-3062": {"Subject": "Climate Change & Worker Health", "Grade": "B"},  # Climate Policy
+        "2667-2782": {"Subject": "Climate Change & Worker Health", "Grade": "B"},  # The Journal of Climate Change and Health
+        "2332-8940": {"Subject": "Climate Change & Worker Health", "Grade": "B"},  # Temperature  [corrected: top hit was J Low Temperature Physics]
+        "2767-3375": {"Subject": "Climate Change & Worker Health", "Grade": "B"},  # PLOS Global Public Health
+
+        # --- Policy, Regulation & Health Systems ---
+        "0278-2715": {"Subject": "Policy, Regulation & Health Systems", "Grade": "A"},  # Health Affairs
+        "0887-378X": {"Subject": "Policy, Regulation & Health Systems", "Grade": "A"},  # Milbank Quarterly
+        "0277-9536": {"Subject": "Policy, Regulation & Health Systems", "Grade": "A"},  # Social Science & Medicine
+        "0268-1080": {"Subject": "Policy, Regulation & Health Systems", "Grade": "A"},  # Health Policy and Planning
+        "0017-9124": {"Subject": "Policy, Regulation & Health Systems", "Grade": "A"},  # Health Services Research  [corrected: top hit was BMC Health Services Research]
+        "2468-2667": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # The Lancet Public Health
+        "0090-0036": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # American Journal of Public Health
+        "0168-8510": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # Health Policy
+        "2213-5383": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # Journal of Cancer Policy
+        "1101-1262": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # European Journal of Public Health
+        "1355-8196": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # Journal of Health Services Research & Policy
+        "0197-5897": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # Journal of Public Health Policy
+        "0925-7535": {"Subject": "Policy, Regulation & Health Systems", "Grade": "B"},  # Safety Science
+        "1026-9428": {"Subject": "Policy, Regulation & Health Systems", "Grade": "C"},  # Russian Journal of Occupational Health and Industrial Ecology  [Medicina Truda]
+    },
+}

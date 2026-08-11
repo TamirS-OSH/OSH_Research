@@ -87,3 +87,88 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./pages_output
           keep_files: true
+
+  # Second edition: occupational cancer research, for a single researcher.
+  # `needs:` serialises it behind the IIOSH edition so the two never hit the
+  # shared GEMINI_API_KEY concurrently — the 12s sleeps in newsletter.py are
+  # calibrated for one caller at ~5 RPM. `if: always()` keeps that ordering
+  # without coupling failure: an IIOSH error must not silently cancel this send.
+  send-newsletter-occ:
+    runs-on: ubuntu-latest
+    needs: send-newsletter
+    if: always()
+
+    permissions:
+      contents: 'write'
+
+    steps:
+      # Extra margin on top of the natural runner teardown/spin-up gap, in case
+      # quota is accounted over a sliding window. Note this does nothing for a
+      # daily (RPD) limit — that would need a different day, not a longer wait.
+      - name: Cool-off before second edition
+        run: sleep 300
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install -r newsletter/requirements.txt
+
+      - name: Generate Newsletter & Send Email
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_LIST_OCC: ${{ secrets.RECIPIENT_LIST_OCC }}
+          PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research/occ'
+          OPENALEX_MAILTO: ${{ secrets.GMAIL_USER }}
+          PYTHONUNBUFFERED: '1'
+        run: python newsletter/newsletter.py --edition occ_cancer
+
+      # The tracked-author feed uses a 30-day window, so without a persisted
+      # seen-set the same paper would be re-sent for four consecutive weeks.
+      # Non-fatal: the newsletter has already gone out by this point, and the
+      # only cost of a failed push is duplicates next run.
+      - name: Persist author-feed seen state
+        continue-on-error: true
+        run: |
+          if [ -z "$(git status --porcelain state/)" ]; then
+            echo "No seen-state change to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/
+          git commit -m "chore: update occ_cancer author-feed seen state [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Prepare Pages content
+        id: prep
+        run: |
+          shopt -s nullglob
+          files=(OccCancer_Research_Update_*.html)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::No occupational-cancer newsletter HTML produced (0 articles passed the keyword filter, or 0 fetched). Skipping publish. Check the [KW] and [DIAG] lines above."
+            echo "produced=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Published under /occ so the two editions never contend for index.html.
+          mkdir -p pages_output/occ
+          cp OccCancer_Research_Update_*.html pages_output/occ/
+          latest=$(ls -t OccCancer_Research_Update_*.html | head -1)
+          cp "$latest" pages_output/occ/index.html
+          echo "produced=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to GitHub Pages
+        if: steps.prep.outputs.produced == 'true'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages_output
+          keep_files: true

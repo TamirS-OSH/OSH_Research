@@ -1,3 +1,5 @@
+import argparse
+import json
 import os
 import re
 import requests
@@ -8,12 +10,49 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from google import genai
 
+import editions
+
 # --- 1. CONFIGURATION ---
+# Everything edition-specific (journals, tiering, branding, recipients) lives in
+# newsletter/editions/<slug>.py. The rest of this file is edition-agnostic.
+_parser = argparse.ArgumentParser(description="Generate and send a research newsletter edition.")
+_parser.add_argument(
+    "--edition",
+    default="iiosh",
+    help=f"Edition to build ({', '.join(editions.AVAILABLE)}). Default: iiosh",
+)
+_args, _ = _parser.parse_known_args()
+EDITION = editions.load(_args.edition)
+print(f"Building edition: {EDITION['slug']}", flush=True)
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-PAGE_BASE_URL = os.environ.get("PAGE_BASE_URL", "https://tamirs-osh.github.io/OSH_Research")
+PAGE_BASE_URL = os.environ.get("PAGE_BASE_URL", EDITION["page_base_url_default"])
 
 # EDITORIAL CONTROL: Maximum number of articles allowed per subject category
-MAX_ARTICLES_PER_SUBJECT = 5  
+MAX_ARTICLES_PER_SUBJECT = EDITION["max_articles_per_subject"]
+
+# Relevance filtering, in two classes of term:
+#   core    — inherently on-topic anchors ("occupational exposure", "asbestos");
+#             one match is enough to keep an article.
+#   context — only meaningful with corroboration ("climate change", "latency");
+#             these need KEYWORD_MIN_SCORE matches between them.
+#
+# Measured over 90 days of real abstracts, this rule suppresses broad-scope
+# journals as hard as a flat score>=2 (2% pass rate) while keeping three times
+# as much genuinely relevant material from the focused journals (43% vs 13%).
+# A flat score>=1 was far too loose: it passed 47% of Nature Climate Change,
+# including a paper on marine species conservation that matched "climate change".
+#
+# All inert when both lists are empty, which is why the IIOSH edition is
+# unaffected by this stage.
+KEYWORDS_CORE = EDITION.get("keywords_core", [])
+KEYWORDS_CONTEXT = EDITION.get("keywords_context", [])
+KEYWORDS = KEYWORDS_CORE + KEYWORDS_CONTEXT
+KEYWORDS_CORE_SET = set(KEYWORDS_CORE)
+KEYWORD_MIN_SCORE = EDITION.get("keyword_min_score", 0)
+
+# Persisted dedupe state for tracked-author feeds (see gather_author_candidates).
+SEEN_STATE_PATH = os.path.join("state", f"{EDITION['slug']}_seen.json")
 
 # Calculate the date 7 days ago (Weekly Roundup)
 RECENT_DATE = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
@@ -28,48 +67,8 @@ REQUEST_HEADERS = {
 # Initialize Gemini Client
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# The FULL IIOSH target journals list
-JOURNAL_MAPPING = {
-    "0355-3140": {"Subject": "Occupational Health", "Grade": "Q1"}, 
-    "1351-0711": {"Subject": "Occupational Health", "Grade": "Q1"}, 
-    "1076-2752": {"Subject": "Occupational Health", "Grade": "Q2"}, 
-    "1097-0274": {"Subject": "Occupational Health", "Grade": "Q2"}, 
-    "1432-1246": {"Subject": "Occupational Health", "Grade": "Q2"}, 
-    "1348-9585": {"Subject": "Occupational Health", "Grade": "Q2"}, 
-    "2165-0969": {"Subject": "Occupational Health", "Grade": "Q2"}, 
-    "0925-7535": {"Subject": "Occupational Safety", "Grade": "Q1"}, 
-    "0022-4375": {"Subject": "Occupational Safety", "Grade": "Q1"}, 
-    "0001-4575": {"Subject": "Occupational Safety", "Grade": "Q1"}, 
-    "2093-7997": {"Subject": "Occupational Safety", "Grade": "Q1"}, 
-    "0950-4230": {"Subject": "Occupational Safety", "Grade": "Q1"}, 
-    "1080-3548": {"Subject": "Occupational Safety", "Grade": "Q2"}, 
-    "2398-7316": {"Subject": "Occupational Hygiene", "Grade": "Q1"}, 
-    "1545-9632": {"Subject": "Occupational Hygiene", "Grade": "Q1"}, 
-    "1438-4639": {"Subject": "Occupational Hygiene", "Grade": "Q1"}, 
-    "1559-064X": {"Subject": "Occupational Hygiene", "Grade": "Q1"}, 
-    "1939-1307": {"Subject": "Occ. Health & Stress", "Grade": "Q1"}, 
-    "1464-5335": {"Subject": "Occ. Health & Stress", "Grade": "Q1"}, 
-    "0021-9010": {"Subject": "Applied Psych & Org Behavior", "Grade": "Q1"}, 
-    "1099-1379": {"Subject": "Applied Psych & Org Behavior", "Grade": "Q1"}, 
-    "0001-8791": {"Subject": "Applied Psych & Org Behavior", "Grade": "Q1"}, 
-    "0149-2063": {"Subject": "Applied Psych & Org Behavior", "Grade": "Q1"}, 
-    "0018-7267": {"Subject": "Applied Psych & Org Behavior", "Grade": "Q1"}, 
-    "0003-6870": {"Subject": "General & Physical Ergonomics", "Grade": "Q1"}, 
-    "0018-7208": {"Subject": "General & Physical Ergonomics", "Grade": "Q1"}, 
-    "0014-0139": {"Subject": "General & Physical Ergonomics", "Grade": "Q1/Q2"}, 
-    "0169-8141": {"Subject": "General & Physical Ergonomics", "Grade": "Q2"}, 
-    "1463-922X": {"Subject": "General & Physical Ergonomics", "Grade": "Q2"}, 
-    "1053-0487": {"Subject": "Musculoskeletal Health", "Grade": "Q1"}, 
-    "0021-9290": {"Subject": "Musculoskeletal Health", "Grade": "Q1/Q2"}, 
-    "0268-0033": {"Subject": "Musculoskeletal Health", "Grade": "Q2"}, 
-    "1471-2474": {"Subject": "Musculoskeletal Health", "Grade": "Q2"}, 
-    "0966-6362": {"Subject": "Musculoskeletal Health", "Grade": "Q2"}, 
-    "1071-5819": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
-    "2168-2291": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
-    "1044-7318": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
-    "1436-6556": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1/Q2"}, 
-    "1520-6564": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q2"}
-}
+# Target journals for this edition: ISSN -> {Subject, Grade}
+JOURNAL_MAPPING = EDITION["journals"]
 
 # --- 2. HELPER FUNCTIONS ---
 def fetch_openalex(url, issn, subject, max_retries=4):
@@ -118,6 +117,46 @@ def unscramble_abstract(inverted_index):
         for pos in positions:
             words[pos] = word
     return " ".join(words).strip()
+
+# Character class spanning U+2010..U+2015 (hyphen, non-breaking hyphen, figure
+# dash, en dash, em dash, horizontal bar) plus the ASCII hyphen. The first and
+# last characters of the range are literal, so take care if editing this line.
+DASH_PATTERN = re.compile("[‐-―\\-]")
+
+
+def normalize_text(text):
+    """Lowercase and flatten punctuation so keyword matching is robust.
+
+    Collapses hyphens and en/em dashes to spaces, which makes 'never-smokers'
+    match 'never smokers' and the doc's 'exposure–response' (en dash) match a
+    paper's 'exposure-response'. The result is space-padded so callers can test
+    for ' term ' and get word-boundary matching for free.
+    """
+    # ‐-― covers hyphen, non-breaking hyphen, figure/en/em dash and
+    # horizontal bar; spelled as escapes so the source can't be mangled by an
+    # editor silently normalising the literal characters.
+    lowered = DASH_PATTERN.sub(" ", text.lower())
+    return " " + re.sub(r"[^a-z0-9]+", " ", lowered).strip() + " "
+
+
+def keyword_score(title, abstract):
+    """Score an article against the edition's keyword lists.
+
+    Returns (total distinct matches, core matches, matched terms). Editions with
+    no keywords always score 0 and are never filtered — see gather_candidates.
+    """
+    if not KEYWORDS:
+        return 0, 0, []
+    haystack = normalize_text(f"{title} {abstract}")
+    matched = [term for term in KEYWORDS if f" {term} " in haystack]
+    core_hits = sum(1 for term in matched if term in KEYWORDS_CORE_SET)
+    return len(matched), core_hits, matched
+
+
+def is_relevant(score, core_hits):
+    """Apply the two-class relevance rule: one core anchor, or enough context."""
+    return core_hits >= 1 or score >= KEYWORD_MIN_SCORE
+
 
 def summarize_with_ai(title, abstract):
     if not abstract:
@@ -247,9 +286,9 @@ def synthesize_global_meta_briefing(all_articles):
     return {"en": "Global trends summary unavailable.", "he": "תקציר מגמות אינו זמין."}
 
 # --- 3. FETCHING AND PROCESSING ---
-# When a domain yields this many usable Q1 articles or fewer, widen the search
-# to also include that domain's Q1/Q2 and Q2 journals.
-FALLBACK_THRESHOLD = 2
+# "fallback" editions only: when a domain yields this many usable primary-tier
+# articles or fewer, widen the search to that domain's lower-graded journals.
+FALLBACK_THRESHOLD = EDITION["selection"].get("threshold", 2)
 
 
 def gather_candidates(journal_entries, subject):
@@ -276,8 +315,27 @@ def gather_candidates(journal_entries, subject):
             raw_abstract = unscramble_abstract(work.get('abstract_inverted_index'))
             if not raw_abstract:
                 continue
+
+            title = work.get('title', 'Untitled')
+
+            # Relevance gate. Runs before any Gemini call, so an off-topic paper
+            # never costs a summarization request. Inert when the edition has no
+            # keywords, which is why the IIOSH edition is unaffected.
+            if KEYWORDS:
+                score, core_hits, matched = keyword_score(title, raw_abstract)
+                keep = is_relevant(score, core_hits)
+                # Every candidate is logged, rejects included, so the rule can be
+                # retuned from observed scores rather than guessed at.
+                print(
+                    f"[KW] {'KEEP' if keep else 'DROP'} score={score} core={core_hits} "
+                    f"min={KEYWORD_MIN_SCORE} terms=[{', '.join(matched[:6])}] :: {title[:70]}",
+                    flush=True,
+                )
+                if not keep:
+                    continue
+
             candidates.append({
-                "title": work.get('title', 'Untitled'),
+                "title": title,
                 "journal": work.get('primary_location', {}).get('source', {}).get('display_name', 'Unknown Journal'),
                 "link": work.get('doi', work.get('id')),
                 "abstract": raw_abstract,
@@ -287,12 +345,33 @@ def gather_candidates(journal_entries, subject):
     return candidates
 
 
-def fetch_and_summarize():
-    print(f"Starting bilingual weekly data pull (tiered Q1 -> Q1/Q2+Q2 fallback, Max {MAX_ARTICLES_PER_SUBJECT} per category)...")
-    print(f"Fetching articles published since {RECENT_DATE}...\n")
+def build_subject_tiers():
+    """Group journals by subject and split them into a primary and fallback tier.
 
-    # Group journals by subject (preserving first-seen order) and split into a
-    # primary Q1 tier and a fallback tier (Q1/Q2 ahead of pure Q2).
+    Driven by the edition's `selection` config:
+
+      mode="fallback" — query the `primary` grades first and widen to the rest
+                        only when a subject comes back thin. This is the original
+                        IIOSH behaviour (Q1, widening to Q1/Q2 then Q2).
+      mode="ranked"   — query every grade in `include` on each run, ordered by
+                        `rank_order`, with no fallback stage. Grades outside
+                        `include` are skipped entirely, which is how tier C stays
+                        configured but out of the weekly run.
+
+    Returns (subjects_order, tier1, tier2); tier2 is empty in ranked mode.
+    """
+    selection = EDITION["selection"]
+    mode = selection["mode"]
+
+    if mode == "fallback":
+        primary = selection["primary"]
+        fallback_order = selection.get("fallback_order", [])
+    else:
+        primary = selection["include"]
+        fallback_order = []
+
+    rank_order = selection.get("rank_order", primary)
+
     subjects_order = []
     tier1, tier2 = {}, {}
     for issn, info in JOURNAL_MAPPING.items():
@@ -300,9 +379,131 @@ def fetch_and_summarize():
         if subject not in tier1:
             subjects_order.append(subject)
             tier1[subject], tier2[subject] = [], []
-        (tier1 if grade == "Q1" else tier2)[subject].append((issn, grade))
-    for subject in tier2:
-        tier2[subject].sort(key=lambda e: 0 if e[1] == "Q1/Q2" else 1)
+        if grade in primary:
+            tier1[subject].append((issn, grade))
+        elif mode == "fallback":
+            tier2[subject].append((issn, grade))
+
+    # sorted() is stable, so journals keep their configured order within a grade.
+    if mode == "fallback":
+        for subject in tier2:
+            tier2[subject].sort(
+                key=lambda e: fallback_order.index(e[1]) if e[1] in fallback_order else len(fallback_order)
+            )
+    else:
+        for subject in tier1:
+            tier1[subject].sort(
+                key=lambda e: rank_order.index(e[1]) if e[1] in rank_order else len(rank_order)
+            )
+
+    return subjects_order, tier1, tier2
+
+
+def load_seen_state():
+    """Return the persisted (work_ids, title_keys) already sent by this edition."""
+    try:
+        with open(SEEN_STATE_PATH, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return set(data.get("work_ids", [])), set(data.get("title_keys", []))
+    except (FileNotFoundError, ValueError):
+        return set(), set()
+
+
+def save_seen_state(work_ids, title_keys):
+    os.makedirs(os.path.dirname(SEEN_STATE_PATH), exist_ok=True)
+    with open(SEEN_STATE_PATH, "w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "work_ids": sorted(work_ids),
+                "title_keys": sorted(title_keys),
+                "updated": datetime.now().strftime("%Y-%m-%d"),
+            },
+            handle,
+            indent=2,
+            ensure_ascii=False,
+        )
+
+
+def gather_author_candidates(author, seen_ids, seen_titles):
+    """Fetch a tracked researcher's recent publications, minus anything already sent.
+
+    Deliberately independent of the journal list, the tier ranking and the
+    keyword filter: the point is to catch everything this person publishes,
+    including in venues that are not on the list at all.
+
+    The window is 30 days rather than the journal feed's 7. An individual
+    researcher publishes only a handful of articles a year, so a weekly window
+    would be empty on almost every run. That makes dedupe mandatory — otherwise
+    the same paper reappears for four consecutive weeks.
+
+    Records are restricted to real articles with abstracts. OpenAlex also
+    returns conference abstracts and companion "Data from ..." / "Supplementary
+    Figure from ..." stubs for the same work, which are noise in a digest.
+    """
+    window_days = author.get("window_days", 30)
+    since = (datetime.now() - timedelta(days=window_days)).strftime('%Y-%m-%d')
+    filters = [
+        f"author.id:{author['openalex_id']}",
+        f"from_publication_date:{since}",
+    ]
+    if author.get("types"):
+        filters.append("type:" + "|".join(author["types"]))
+    if author.get("require_abstract", True):
+        filters.append("has_abstract:true")
+
+    url = (
+        "https://api.openalex.org/works?filter=" + ",".join(filters)
+        + "&sort=publication_date:desc&per_page=25"
+    )
+    if OPENALEX_MAILTO:
+        url += f"&mailto={OPENALEX_MAILTO}"
+
+    label = author["name"]
+    response = fetch_openalex(url, author["openalex_id"], label)
+    if response is None:
+        print(f"   ⚠️ Gave up on tracked author {label} after retries. Skipping.", flush=True)
+        return []
+
+    candidates = []
+    for work in response.json().get('results', []):
+        work_id = (work.get('id') or '').replace('https://openalex.org/', '')
+        raw_abstract = unscramble_abstract(work.get('abstract_inverted_index'))
+        if not raw_abstract:
+            continue
+
+        title = work.get('title', 'Untitled')
+        # Dedupe on both the OpenAlex ID and a normalised title: the same paper
+        # can appear under two IDs (e.g. an editorial carried by two venues),
+        # which an ID-only seen-set would let through twice.
+        title_key = normalize_text(title).strip()
+        if work_id in seen_ids or title_key in seen_titles:
+            print(f"[AUTHOR] SEEN  {label}: {title[:70]}", flush=True)
+            continue
+
+        print(f"[AUTHOR] NEW   {label}: {title[:70]}", flush=True)
+        candidates.append({
+            "title": title,
+            "journal": work.get('primary_location', {}).get('source', {}).get('display_name', 'Unknown Journal'),
+            "link": work.get('doi', work.get('id')),
+            "abstract": raw_abstract,
+            "grade": "",
+            "work_id": work_id,
+            "title_key": title_key,
+        })
+
+    return candidates
+
+
+def fetch_and_summarize():
+    selection_mode = EDITION["selection"]["mode"]
+    strategy = (
+        "tiered Q1 -> Q1/Q2+Q2 fallback" if selection_mode == "fallback"
+        else "ranked " + "+".join(EDITION["selection"]["include"])
+    )
+    print(f"Starting bilingual weekly data pull ({strategy}, Max {MAX_ARTICLES_PER_SUBJECT} per category)...")
+    print(f"Fetching articles published since {RECENT_DATE}...\n")
+
+    subjects_order, tier1, tier2 = build_subject_tiers()
 
     newsletter_data = {}
     flat_articles_list = []
@@ -311,13 +512,14 @@ def fetch_and_summarize():
     for subject in subjects_order:
         print(f"\n--- Domain: {subject} ---")
         candidates = gather_candidates(tier1[subject], subject)
-        print(f"[DIAG] Domain '{subject}': {len(candidates)} usable Q1 article(s).", flush=True)
+        print(f"[DIAG] Domain '{subject}': {len(candidates)} usable primary-tier article(s).", flush=True)
 
-        if len(candidates) <= FALLBACK_THRESHOLD and tier2[subject]:
-            print(f"[DIAG] Domain '{subject}' at/under threshold ({FALLBACK_THRESHOLD}); widening to Q1/Q2 + Q2.", flush=True)
-            candidates += gather_candidates(tier2[subject], subject)
-        elif len(candidates) <= FALLBACK_THRESHOLD:
-            print(f"[DIAG] Domain '{subject}' at/under threshold but has no lower-graded journals to fall back to.", flush=True)
+        if selection_mode == "fallback":
+            if len(candidates) <= FALLBACK_THRESHOLD and tier2[subject]:
+                print(f"[DIAG] Domain '{subject}' at/under threshold ({FALLBACK_THRESHOLD}); widening to Q1/Q2 + Q2.", flush=True)
+                candidates += gather_candidates(tier2[subject], subject)
+            elif len(candidates) <= FALLBACK_THRESHOLD:
+                print(f"[DIAG] Domain '{subject}' at/under threshold but has no lower-graded journals to fall back to.", flush=True)
 
         selected = candidates[:MAX_ARTICLES_PER_SUBJECT]
         if not selected:
@@ -344,6 +546,51 @@ def fetch_and_summarize():
             flat_articles_list.append(article_node)
             time.sleep(12)
 
+    # Tracked-author feed. Each author becomes its own section, appended after
+    # the themed domains. No-op for editions with no tracked_authors.
+    tracked_authors = EDITION.get("tracked_authors", [])
+    if tracked_authors:
+        seen_ids, seen_titles = load_seen_state()
+        newly_sent_ids, newly_sent_titles = set(), set()
+
+        for author in tracked_authors:
+            section = author.get("section_title", f"Tracked Researcher: {author['name']}")
+            print(f"\n--- {section} ---")
+            author_candidates = gather_author_candidates(author, seen_ids, seen_titles)
+            if not author_candidates:
+                window = author.get("window_days", 30)
+                print(f"[DIAG] No unseen publications for {author['name']} in the last {window} days.", flush=True)
+                continue
+
+            newsletter_data[section] = {"domain_summary_en": "", "domain_summary_he": "", "articles": []}
+            # Anything over the cap is left unmarked, so it surfaces next run
+            # instead of being silently dropped.
+            for cand in author_candidates[:MAX_ARTICLES_PER_SUBJECT]:
+                total_articles_processed += 1
+                article_id = f"art-{total_articles_processed}"
+                print(f"[{total_articles_processed}] Processing ({author['name']}): {cand['title'][:40]}...")
+                bilingual_summaries = summarize_with_ai(cand["title"], cand["abstract"])
+
+                article_node = {
+                    "id": article_id,
+                    "title": cand["title"],
+                    "journal": cand["journal"],
+                    "grade": cand["grade"],
+                    "link": cand["link"],
+                    "summary_en": bilingual_summaries["en"],
+                    "summary_he": bilingual_summaries["he"],
+                }
+
+                newsletter_data[section]["articles"].append(article_node)
+                flat_articles_list.append(article_node)
+                newly_sent_ids.add(cand["work_id"])
+                newly_sent_titles.add(cand["title_key"])
+                time.sleep(12)
+
+        save_seen_state(seen_ids | newly_sent_ids, seen_titles | newly_sent_titles)
+        print(f"[DIAG] Seen-state written to {SEEN_STATE_PATH} "
+              f"({len(seen_ids | newly_sent_ids)} work ids).", flush=True)
+
     print("\n" + "="*40)
     print("🧠 Generating Bilingual Category Executive Overviews...")
     print("="*40)
@@ -365,15 +612,26 @@ def fetch_and_summarize():
 
 # --- 4. LOCAL HTML GENERATION ---
 def grade_badge_html(grade):
-    """Return a small coloured pill showing the journal's quartile grade."""
+    """Return a small coloured pill showing the journal's grade for this edition.
+
+    Quartile grades (Q1/Q1-Q2/Q2) and monitoring tiers (A/B/C) share one palette;
+    the keys don't collide, so an edition uses whichever vocabulary it configures.
+    Articles with no grade — tracked-author entries, which sit outside the tier
+    system — render no badge at all.
+    """
+    if not grade:
+        return ""
     palette = {
         "Q1":    ("#dbeafe", "#1d4ed8", "#1e3a8a"),  # blue
         "Q1/Q2": ("#cffafe", "#0e7490", "#155e75"),  # cyan (hybrid)
         "Q2":    ("#fef3c7", "#b45309", "#92400e"),  # amber
+        "A":     ("#dbeafe", "#1d4ed8", "#1e3a8a"),  # blue  — core weekly
+        "B":     ("#cffafe", "#0e7490", "#155e75"),  # cyan  — focused
+        "C":     ("#fef3c7", "#b45309", "#92400e"),  # amber — periodic
     }
     bg, border, text = palette.get(grade, ("#f1f5f9", "#94a3b8", "#475569"))
     return (
-        f"<span title=\"Journal quartile ranking\" style=\"display: inline-block; "
+        f"<span title=\"{EDITION['badge_tooltip']}\" style=\"display: inline-block; "
         f"padding: 3px 11px; background-color: {bg}; border: 1px solid {border}; "
         f"color: {text}; border-radius: 999px; font-size: 11px; font-weight: 800; "
         f"letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap;\">{grade}</span>"
@@ -390,7 +648,7 @@ def generate_local_html(newsletter_data, global_meta):
     html_content = f"""
     <html>
     <body dir="ltr" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; max-width: 850px; margin: 40px auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-        <h2 style="color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0; font-size: 26px; font-weight: 800;">IIOSH Weekly Research Update <span style="color: #94a3b8; font-weight: 300; font-size: 20px; margin: 0 10px;">|</span> לקט מחקרים שבועי</h2>
+        <h2 style="color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0; font-size: 26px; font-weight: 800;">{EDITION['title_en']} <span style="color: #94a3b8; font-weight: 300; font-size: 20px; margin: 0 10px;">|</span> {EDITION['title_he']}</h2>
         
         <div style="margin: 20px 0 35px 0; padding: 22px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 14.5px; line-height: 1.65;">
             <h3 style="margin-top: 0; margin-bottom: 14px; color: #1e3a8a; font-size: 17px; font-weight: 800; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;">Weekly Digest & Main Trends / תמצית מגמות שבועי</h3>
@@ -399,7 +657,7 @@ def generate_local_html(newsletter_data, global_meta):
             <p dir="rtl" style="margin: 0; text-align: right; font-weight: 500; font-size: 15px; line-height: 1.7;">{global_meta['he']}</p>
         </div>
         
-        <p style="color: #475569; font-size: 15px; margin-bottom: 30px;">Here are the top discoveries published in high-impact journals over the past 7 days &mdash; primarily Q1, widening to Q1/Q2 and Q2 where weekly coverage is thin &mdash; categorized by subject domain. Each article is tagged with its journal quartile ranking:</p>
+        <p style="color: #475569; font-size: 15px; margin-bottom: 30px;">{EDITION['intro_html']}</p>
     """
     
     for subject, domain_data in newsletter_data.items():
@@ -448,7 +706,7 @@ def generate_local_html(newsletter_data, global_meta):
     </html>
     """
     
-    filename = f"IIOSH_Research_Update_{datetime.now().strftime('%Y-%m-%d')}.html"
+    filename = f"{EDITION['file_prefix']}_{datetime.now().strftime('%Y-%m-%d')}.html"
     try:
         with open(filename, "w", encoding="utf-8") as file:
             file.write(html_content)
@@ -475,9 +733,17 @@ def build_email_body(global_meta, page_url):
         global_meta.get('he', '')
     )
 
+    # Held as a literal (including its leading newline and indentation) so the
+    # IIOSH email is byte-identical; editions without a dashboard omit the block.
+    dashboard_button = ""
+    if EDITION["show_dashboard_button"]:
+        dashboard_button = """
+        <br><br>
+        <a href="https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #15803d; text-decoration: none; border: 2px solid #15803d; border-radius: 6px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Check the Literature Dashboard  לבדיקת דשבורד הספרות המחקרית</a>"""
+
     return f"""<html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h2 style="color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0; font-size: 22px; font-weight: 800;">IIOSH Weekly Research Update <span style="color: #94a3b8; font-weight: 300; font-size: 16px; margin: 0 8px;">|</span> לקט מחקרים שבועי</h2>
+    <h2 style="color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0; font-size: 22px; font-weight: 800;">{EDITION['title_en']} <span style="color: #94a3b8; font-weight: 300; font-size: 16px; margin: 0 8px;">|</span> {EDITION['title_he']}</h2>
 
     <div style="margin: 20px 0; padding: 18px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 14px; line-height: 1.65;">
         <h3 style="margin-top: 0; margin-bottom: 10px; color: #1e3a8a; font-size: 15px; font-weight: 800; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px;">Weekly Digest & Main Trends / תמצית מגמות שבועי</h3>
@@ -487,9 +753,7 @@ def build_email_body(global_meta, page_url):
     </div>
 
     <div style="text-align: center; margin: 30px 0;">
-        <a href="{page_url}" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #2563eb; text-decoration: none; border: 2px solid #2563eb; border-radius: 6px; font-weight: 700; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Read the Full Update  לקריאת הסקירה המלאה</a>
-        <br><br>
-        <a href="https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #15803d; text-decoration: none; border: 2px solid #15803d; border-radius: 6px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Check the Literature Dashboard  לבדיקת דשבורד הספרות המחקרית</a>
+        <a href="{page_url}" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #2563eb; text-decoration: none; border: 2px solid #2563eb; border-radius: 6px; font-weight: 700; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Read the Full Update  לקריאת הסקירה המלאה</a>{dashboard_button}
     </div>
 
     <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 30px;">
@@ -507,7 +771,7 @@ def send_email(subject, html_body, recipients):
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = f"IIOSH Research Update <{gmail_user}>"
+    msg['From'] = f"{EDITION['email_from_name']} <{gmail_user}>"
     msg['To'] = gmail_user
 
     msg.attach(MIMEText(html_body, 'html', 'utf-8'))
@@ -530,14 +794,14 @@ if __name__ == "__main__":
         page_url = f"{PAGE_BASE_URL}/{filename}"
         email_body = build_email_body(meta_brief, page_url)
 
-        recipient_str = os.environ.get("RECIPIENT_LIST", "")
+        recipient_str = os.environ.get(EDITION["recipient_env"], "")
         recipients = [r.strip() for r in recipient_str.split(",") if r.strip()]
 
         if recipients:
             send_email(
-                "IIOSH Weekly Research Update | לקט מחקרים שבועי",
+                EDITION["email_subject"],
                 email_body,
                 recipients
             )
         else:
-            print("No recipients configured. Skipping email send.")
+            print(f"No recipients configured in {EDITION['recipient_env']}. Skipping email send.")
