@@ -119,6 +119,28 @@ EDITION = {
         "work retention",
         "workplace accommodation",
         "cancer survivorship",
+        # Added after the first live run, which dropped three unmistakably
+        # on-topic papers at score=0 purely because the vocabulary lacked the
+        # words: "Pesticides Exposure in Horticultural Work", "Occupational
+        # health risks among live-in caregivers", and a pneumoconiosis panel.
+        # These additions raised focused-journal recall from 43% to 55%.
+        "occupational health",
+        "occupational safety",
+        "occupational medicine",
+        "occupational hygiene",
+        "occupational risk",
+        "occupational lung disease",
+        "pneumoconiosis",
+        "silicosis",
+        "asbestosis",
+        "mesothelioma",
+        "pesticide",
+        "pesticides",
+        "carcinogenic",
+        # IARC classifies shift work involving circadian disruption as probably
+        # carcinogenic, so it belongs in an occupational cancer feed.
+        "shift work",
+        "night shift",
     ],
     # CONTEXT: real signal, but common enough outside her field that one alone
     # means little. Needs keyword_min_score matches between them to carry an
@@ -160,6 +182,46 @@ EDITION = {
     ],
     # Context-only articles need this many matches. Core matches bypass it.
     "keyword_min_score": 2,
+
+    # Subject gate, applied BEFORE the topic rule above: an article must show
+    # some occupational content or it is rejected outright, however well it
+    # scores on topic.
+    #
+    # Added after the first live run selected "Developing a strategic plan for a
+    # climate-resilient health system" — no work content at all, admitted purely
+    # by "climate change" + "air pollution". Her subject is not climate, or
+    # policy, or oncology; it is *occupational* climate, policy and oncology.
+    #
+    # Effect over 90 days: broad-journal noise 3.0% -> 1.3% (Nature Climate
+    # Change 7% -> 0%, PLOS Global Public Health 4% -> 0%, Health Affairs
+    # 2% -> 0%) for four points of recall on the focused journals.
+    #
+    # NOTE: "workforce" is deliberately absent. In health-policy writing it
+    # means hospital staffing levels, and it was the single anchor that let the
+    # climate-resilient-health-system paper through on a first attempt.
+    "occupational_anchors": [
+        "occupational",
+        "occupation",
+        "worker",
+        "workers",
+        "workplace",
+        "work related",
+        "working conditions",
+        "at work",
+        "employee",
+        "employees",
+        "employment",
+        "job exposure",
+        "job strain",
+        "return to work",
+        "work ability",
+        "miner",
+        "miners",
+        "farmer",
+        "farmers",
+        "shift work",
+        "night shift",
+    ],
 
     # Standalone section, independent of the journal list, tiers and keyword
     # filter — it should catch anything she publishes, including in venues that

@@ -125,26 +125,31 @@ Scoring runs **locally on title + abstract, before any Gemini call** — determi
 4. **Calibration logging.** Every candidate is logged with its score, core count and matched terms — rejects included — so the rule can be retuned from observed output.
 5. **Empty themes** are omitted from the newsletter; the existing `if not selected: continue` already handles this.
 
-### Why a flat threshold doesn't work here
+### The rule, and how it got here
 
-A flat score was tested against **90 days of real abstracts** (282 articles) across six deliberately broad journals and six focused ones:
+Three iterations, each driven by measurement rather than intuition. Tested against **90 days of real abstracts** across deliberately broad journals and focused ones, plus the first live run's actual week.
 
-| Rule | Broad journals | Focused journals | Separation |
+| Rule | Broad | Focused | Verdict |
 |---|---|---|---|
-| `score >= 1` | 14% pass | 62% pass | 47 pts |
-| `score >= 2` | 2% pass | 13% pass | 11 pts |
-| **`>=1 core term, or >=2 total`** | **2% pass** | **43% pass** | **41 pts** |
+| `score >= 1` | 14% | 62% | Far too loose |
+| `score >= 2` | 2% | 13% | Too tight |
+| `>=1 core, or >=2 total` | 3.0% | 55% | Shipped, then failed live |
+| **`>=1 occupational anchor` AND (`>=1 core` or `>=2 total`)** | **1.3%** | **51%** | **In use** |
 
-`score >= 1` was far too loose — it passed **47% of Nature Climate Change**, including a paper on *marine species conservation* matched via "climate change", and a gynecology paper in *Social Science & Medicine* matched via "cumulative exposure". Raising to `>= 2` fixed the noise but discarded obviously relevant work: *"Reducing respirable silica exposure among brick kiln workers"* and *"Characterization of tremolite asbestos"* both score 1.
+**Iteration 1 → 2.** A flat `>= 1` passed 47% of *Nature Climate Change*, including a paper on *marine species conservation* matched via "climate change". Raising to `>= 2` fixed that but discarded obviously relevant work — *"Reducing respirable silica exposure among brick kiln workers"* scores 1. So terms were split into **core** (inherently occupational; one match suffices) and **context** (common outside her field; needs two).
 
-The problem was never the threshold — it was that a handful of terms carry no occupational signal on their own. So terms are split into two classes:
+**Iteration 2 → 3, from the first live run.** That rule selected 5 articles, of which two were wrong and three obvious hits were missed entirely. Both defects were real:
 
-- **Core (30 terms)** — inherently occupational or specific to her research: `occupational exposure`, `asbestos`, `silica`, `job exposure matrix`, `return to work`, `never smoker`, `workers compensation`… One match keeps the article, because these don't appear by coincidence.
-- **Context (33 terms)** — real signal, but common outside her field: `climate change`, `air pollution`, `latency`, `cumulative exposure`, `administrative data`, `lung cancer`… These need **two** matches between them to carry an article alone.
+- *Vocabulary gaps, not rule failure.* `occupational exposure` was a term but plain `occupational health` was not, so *"Occupational health risks among live-in caregivers"* scored **zero**. Same for `pneumoconiosis`, `pesticide`, `mesothelioma`, `silicosis`. Adding 15 missing anchors lifted focused-journal recall from 43% to 55% at no cost to broad journals.
+- *Topic terms alone must never admit.* The run selected *"Developing a strategic plan for a climate-resilient health system"* — no work content whatsoever — on `climate change` + `air pollution`. Her subject is not climate, or policy, or oncology; it is **occupational** climate, policy and oncology.
 
-That suppresses broad journals exactly as hard as a flat `>= 2` while keeping **three times** as much genuine content from the focused ones. `keyword_min_score: 2` now governs context-only articles; core matches bypass it.
+So a **subject gate** now runs before the topic rule: an article must match one of 21 occupational anchors (`occupational`, `worker`, `workplace`, `shift work`, `return to work`…) or it is rejected outright, however well it scores on topic. Effect: *Nature Climate Change* 7% → 0%, *PLOS Global Public Health* 4% → 0%, *Health Affairs* 2% → 0%, for four points of recall on the focused journals.
 
-> Note: this drops *Lung Cancer* (the journal) from 88% to 8%. That is intended — it publishes mostly clinical oncology, and her subject is the occupational-etiology subset. Worth confirming with her at the first review.
+On the live run's week this keeps exactly the 8 relevant articles and drops both bad ones.
+
+> **`workforce` is deliberately not an anchor.** In health-policy writing it means hospital staffing levels — it was the single anchor that let the climate-resilient-health-system paper through on a first attempt at the gate.
+
+> A context-only path survives (`>=2 context terms` with an occupational anchor) so a paper phrased as "workers · heat stress · climate change", without the literal term `occupational heat`, is still caught.
 
 ---
 
@@ -262,8 +267,13 @@ Each correction was confirmed by direct ISSN lookup returning the right title an
 ### 9.4 Gemini quota headroom
 Worth checking the actual console figures for the account rather than assuming; ≤83 calls/week spaced ≥12s should be comfortable, but RPD is the one limit sequencing cannot help.
 
-### 9.5 Keyword rule — first live review
-The two-class rule (§5) was calibrated on 90 days of historical abstracts, which is a much better starting point than a guess, but it is not a substitute for her judgement. Every candidate is logged with score, core count and matched terms, so after 2–3 live runs review: whether *Lung Cancer* dropping to 8% is desired, and whether the context terms `climate change`, `air pollution`, `latency` and `pah` are pulling their weight.
+### 9.5 Keyword rule — still needs her judgement
+The rule has now survived one live run and been corrected by it (§5), but calibration against historical abstracts is not the same as her reading the output. Every candidate is logged with `score`, `core`, `occ` and matched terms — an `occ=0` on a dropped row means it failed the subject gate rather than the topic rule, which makes the two failure modes distinguishable in the log.
+
+Open questions for the first review with her:
+- **Shift work.** Added to core because IARC classifies circadian-disrupting shift work as probably carcinogenic. Two of the live run's articles came in this way (*"Night work, sleep disruption and long-COVID"*, *"Genomic Landscape … Night Shift Work"*). Relevant, or noise?
+- **Non-cancer occupational outcomes.** *"Occupational exposure to pesticides increases the risk of ALS"* and *"Job strain and ischemic heart disease"* both pass. Squarely occupational, but not cancer. In or out?
+- **Themes ב and ה produced zero** in the live run. Partly a thin week, but worth watching whether the informatics and policy vocabularies are too narrow.
 
 ### 9.6 `RECIPIENT_LIST_OCC` secret
 Must be created in repo settings before the first run. Absent it, the pipeline generates and publishes the newsletter but skips the send with a logged warning rather than failing.
