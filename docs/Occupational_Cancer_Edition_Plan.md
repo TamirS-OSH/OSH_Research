@@ -391,8 +391,10 @@ Finish phase 1 · run the conference signups in parallel right away (no code, im
 | Seen-state save/load round trip | pass |
 | Rendering: own prefix, own branding, no IIOSH leakage, no dashboard button | pass |
 
-Run the identity check against the pre-refactor commit at any time:
+Re-run the identity check at any time. It defaults to the pre-refactor baseline
+(`8fc7c99`), which is the only comparison that proves anything; pass a different
+ref to override, and it refuses rather than silently comparing a file to itself:
 
 ```
-python tests/verify_iiosh_identity.py 8fc7c99
+python tests/verify_iiosh_identity.py
 ```

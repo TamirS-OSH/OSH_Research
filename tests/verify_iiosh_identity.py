@@ -7,15 +7,14 @@ byte-for-byte.
 No network, no API key and no Gemini calls: only the pure rendering functions
 are exercised, with `google.genai` stubbed out so both modules import cleanly.
 
-    python tests/verify_iiosh_identity.py [git-ref]     # default ref: HEAD
+    python tests/verify_iiosh_identity.py [git-ref]
+
+The ref defaults to the pre-refactor baseline below, which is the comparison
+that actually means something. Passing HEAD once the refactor is committed only
+compares the file to itself.
 
 Exit code 0 means the two outputs are identical. Any difference is printed as a
 unified diff and exits 1.
-
-Run this against the commit *before* the refactor. Once the refactor is merged,
-pass that commit explicitly, e.g.:
-
-    python tests/verify_iiosh_identity.py 8fc7c99
 """
 
 import difflib
@@ -27,7 +26,12 @@ import tempfile
 import types
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NEW_MODULE_PATH = os.path.join(REPO_ROOT, "newsletter", "newsletter.py")
+NEWSLETTER_DIR = os.path.join(REPO_ROOT, "newsletter")
+NEW_MODULE_PATH = os.path.join(NEWSLETTER_DIR, "newsletter.py")
+
+# The last commit before the edition refactor. This is the only comparison that
+# proves anything, so it is the default.
+BASELINE_REF = "8fc7c99"
 
 # --- Fixture -----------------------------------------------------------------
 # Deliberately exercises every rendering branch: several domains, all three
@@ -103,12 +107,15 @@ def _stub_genai():
 
 
 def _load_module(path, name):
-    """Import a newsletter.py by path, with newsletter/ on sys.path for `editions`."""
-    pkg_dir = os.path.dirname(path)
-    added = False
-    if pkg_dir not in sys.path:
-        sys.path.insert(0, pkg_dir)
-        added = True
+    """Import a newsletter.py by path.
+
+    The repo's newsletter/ directory goes on sys.path regardless of where the
+    file itself lives, so a post-refactor revision recovered into a temp dir can
+    still resolve `import editions`.
+    """
+    added = [d for d in (os.path.dirname(path), NEWSLETTER_DIR) if d not in sys.path]
+    for directory in added:
+        sys.path.insert(0, directory)
     # The new module parses --edition at import time; keep argv clean so it
     # takes its default (iiosh) rather than this script's arguments.
     saved_argv = sys.argv
@@ -121,8 +128,8 @@ def _load_module(path, name):
         return module
     finally:
         sys.argv = saved_argv
-        if added:
-            sys.path.remove(pkg_dir)
+        for directory in added:
+            sys.path.remove(directory)
 
 
 def _render(module):
@@ -154,8 +161,18 @@ def _diff(label, old, new):
 
 
 def main():
-    ref = sys.argv[1] if len(sys.argv) > 1 else "HEAD"
+    ref = sys.argv[1] if len(sys.argv) > 1 else BASELINE_REF
     print(f"Comparing current newsletter.py against ref '{ref}'...\n")
+    if subprocess.run(["git", "merge-base", "--is-ancestor", ref, "HEAD"],
+                      cwd=REPO_ROOT).returncode == 0:
+        same = subprocess.run(
+            ["git", "diff", "--quiet", ref, "--", "newsletter/newsletter.py"],
+            cwd=REPO_ROOT,
+        ).returncode == 0
+        if same:
+            print(f"'{ref}' has the same newsletter.py as the working tree — "
+                  f"this would compare the file to itself. Pass an earlier ref.")
+            return 2
 
     try:
         old_source = subprocess.check_output(
