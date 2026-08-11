@@ -1,10 +1,29 @@
 name: IIOSH Weekly Automation
 
+# All three inputs default to true, so the weekly Apps Script trigger — which
+# POSTs only {ref: main} and supplies no inputs — keeps behaving exactly as
+# before. They exist so a single edition can be run in isolation for testing or
+# after a partial failure, without sending the institutional newsletter to the
+# whole distribution list as a side effect.
 on:
   workflow_dispatch:
+    inputs:
+      run_dashboard:
+        description: 'Update the Looker Studio dashboard'
+        type: boolean
+        default: true
+      run_iiosh:
+        description: 'Send the IIOSH institutional newsletter (goes to the full distribution list)'
+        type: boolean
+        default: true
+      run_occ:
+        description: 'Send the occupational cancer edition'
+        type: boolean
+        default: true
 
 jobs:
   update-dashboard:
+    if: ${{ inputs.run_dashboard }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -34,6 +53,7 @@ jobs:
         run: python dashboard/scraper.py
 
   send-newsletter:
+    if: ${{ inputs.run_iiosh }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -94,9 +114,11 @@ jobs:
   # calibrated for one caller at ~5 RPM. `if: always()` keeps that ordering
   # without coupling failure: an IIOSH error must not silently cancel this send.
   send-newsletter-occ:
+    # always() keeps the ordering without coupling failure — an IIOSH error, or
+    # an IIOSH job skipped via run_iiosh, must not cancel this send.
+    if: ${{ always() && inputs.run_occ }}
     runs-on: ubuntu-latest
     needs: send-newsletter
-    if: always()
 
     permissions:
       contents: 'write'
@@ -105,7 +127,9 @@ jobs:
       # Extra margin on top of the natural runner teardown/spin-up gap, in case
       # quota is accounted over a sliding window. Note this does nothing for a
       # daily (RPD) limit — that would need a different day, not a longer wait.
+      # Pointless when nothing ran before us, so skipped on an occ-only run.
       - name: Cool-off before second edition
+        if: needs.send-newsletter.result != 'skipped'
         run: sleep 300
 
       - name: Checkout Repository
@@ -145,8 +169,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state/
           git commit -m "chore: update occ_cancer author-feed seen state [skip ci]"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          # Push back to whichever branch was dispatched, never a hardcoded main —
+          # a test run on a feature branch must not write its state onto main.
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
 
       - name: Prepare Pages content
         id: prep
