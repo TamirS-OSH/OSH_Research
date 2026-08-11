@@ -143,13 +143,31 @@ Three iterations, each driven by measurement rather than intuition. Tested again
 - *Vocabulary gaps, not rule failure.* `occupational exposure` was a term but plain `occupational health` was not, so *"Occupational health risks among live-in caregivers"* scored **zero**. Same for `pneumoconiosis`, `pesticide`, `mesothelioma`, `silicosis`. Adding 15 missing anchors lifted focused-journal recall from 43% to 55% at no cost to broad journals.
 - *Topic terms alone must never admit.* The run selected *"Developing a strategic plan for a climate-resilient health system"* — no work content whatsoever — on `climate change` + `air pollution`. Her subject is not climate, or policy, or oncology; it is **occupational** climate, policy and oncology.
 
-So a **subject gate** now runs before the topic rule: an article must match one of 21 occupational anchors (`occupational`, `worker`, `workplace`, `shift work`, `return to work`…) or it is rejected outright, however well it scores on topic. Effect: *Nature Climate Change* 7% → 0%, *PLOS Global Public Health* 4% → 0%, *Health Affairs* 2% → 0%, for four points of recall on the focused journals.
-
-On the live run's week this keeps exactly the 8 relevant articles and drops both bad ones.
+So a **subject gate** now runs before the topic rule: an article must match one of 21 occupational anchors (`occupational`, `worker`, `workplace`, `shift work`, `return to work`…) or it is rejected outright, however well it scores on topic. Effect: *Nature Climate Change* 7% → 0%, *PLOS Global Public Health* 4% → 0%, *Health Affairs* 2% → 0%.
 
 > **`workforce` is deliberately not an anchor.** In health-policy writing it means hospital staffing levels — it was the single anchor that let the climate-resilient-health-system paper through on a first attempt at the gate.
 
-> A context-only path survives (`>=2 context terms` with an occupational anchor) so a paper phrased as "workers · heat stress · climate change", without the literal term `occupational heat`, is still caught.
+**Iteration 3 → 4: terms must be scoped per theme.** The gate fixed "not occupational at all" but exposed a worse problem underneath. Of the 8 articles that rule then selected, **seven were filed under "Lung Cancer & Occupational Exposures" and not one was about lung cancer** — job strain and heart disease, night work and long-COVID, diabetes absenteeism, occupational health of caregivers. All genuinely occupational; none her subject.
+
+The cause was structural. A journal's theme is fixed by the config, but *Occupational and Environmental Medicine* and *SJWEH* publish the whole of occupational health. With one global term list, any term qualifying for any theme admitted an article to **every** theme, so anything occupational landed under whichever heading its journal carried.
+
+Worse, this discarded the most useful thing the source document provides: a **Monitoring topics** column for every single journal — *AJRCCM* → "Lung cancer, occupational respiratory diseases, diesel exhaust, silica, combined exposures"; *J. Occupational Rehabilitation* → "Return to work, work ability, disability management". She specified per-journal scope and the first implementation flattened it.
+
+Terms are now **scoped per theme**, built from that column. An article must earn the heading it is filed under:
+
+| Theme | Requires |
+|---|---|
+| א Lung Cancer & Occupational Exposures | a cancer, a carcinogen, or one of her agents — `require_core` |
+| ב Occupational Data in Health Records | occupational data for health, industry & occupation, occupation coding, work history |
+| ג Return to Work & Rehabilitation | return to work, work ability, accommodation, rehabilitation, sick leave |
+| ד Climate Change & Worker Health | heat stress, wildfire smoke, outdoor workers, thermal strain |
+| ה Policy, Regulation & Health Systems | exposure limits, notification, recognition, compensation, OSH policy |
+
+Theme א additionally sets **`require_core`**, disabling its context-only path. Its context list contains exposure methodology (`job exposure matrices`, `exposure assessment`, `exposome`), and two of those pair with each other to admit a paper with no cancer content at all — which is precisely how the job-strain / ischaemic-heart-disease paper reached a lung cancer heading.
+
+Result on the live run's own week: broad-journal noise **0%**, and the articles kept are the pneumoconiosis panel (theme א) and the return-to-work study (theme ג). The job-strain paper is correctly dropped.
+
+> A context-only path survives in the other four themes, so a paper phrased as "workers · heat stress · climate change", without the literal term `occupational heat`, is still caught.
 
 ---
 
@@ -271,9 +289,13 @@ Worth checking the actual console figures for the account rather than assuming; 
 The rule has now survived one live run and been corrected by it (§5), but calibration against historical abstracts is not the same as her reading the output. Every candidate is logged with `score`, `core`, `occ` and matched terms — an `occ=0` on a dropped row means it failed the subject gate rather than the topic rule, which makes the two failure modes distinguishable in the log.
 
 Open questions for the first review with her:
-- **Shift work.** Added to core because IARC classifies circadian-disrupting shift work as probably carcinogenic. Two of the live run's articles came in this way (*"Night work, sleep disruption and long-COVID"*, *"Genomic Landscape … Night Shift Work"*). Relevant, or noise?
-- **Non-cancer occupational outcomes.** *"Occupational exposure to pesticides increases the risk of ALS"* and *"Job strain and ischemic heart disease"* both pass. Squarely occupational, but not cancer. In or out?
-- **Themes ב and ה produced zero** in the live run. Partly a thin week, but worth watching whether the informatics and policy vocabularies are too narrow.
+- **Volume is now low — 2–3 articles a week, with several themes empty.** This is the direct consequence of holding each theme to its own subject, and it is a genuine trade-off rather than a bug: the alternative is the first run's output, where seven of eight articles sat under a lung cancer heading without being about lung cancer. Whether "few and exact" beats "more and looser" is her call, not ours.
+- **Cross-listed journals lost a role.** Her doc lists *Annals of Work Exposures and Health* and *SJWEH* under **both** themes א and ב. The config gives each journal one theme, so their theme-ב contribution (work history documentation, occupation coding) is currently unreachable — SJWEH's pass rate fell from ~80% to 13% when themes were scoped. **This is the largest single recall loss and the most promising next fix** — see §9.7.
+- **Non-cancer occupational outcomes.** *"Occupational exposure to pesticides → ALS"* now fails theme א, since pesticides are not among the lung carcinogens her doc names. Correct, or too strict?
+- **Shift work** sits in theme א core because IARC classifies circadian-disrupting shift work as probably carcinogenic. Worth confirming she wants it.
+
+### 9.7 Content-based theme routing *(proposed)*
+Today an article is filed under whatever theme its journal is assigned to, and is dropped if it does not match that theme. Routing by **content** instead — letting a work-history paper from *SJWEH* land in theme ב rather than being rejected by theme א — would directly implement the cross-listing her document already specifies, and should recover most of the recall lost above without loosening any theme's standard. Needs a tie-break rule for articles matching more than one theme.
 
 ### 9.6 `RECIPIENT_LIST_OCC` secret
 Must be created in repo settings before the first run. Absent it, the pipeline generates and publishes the newsletter but skips the send with a logged warning rather than failing.

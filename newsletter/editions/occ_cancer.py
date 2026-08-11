@@ -72,115 +72,209 @@ EDITION = {
     #   occupational exposure limits and regulatory policy
     #   implementation of occupational health policy
     #
-    # Terms are split into two classes, because a single flat threshold does not
-    # work on this journal list. Measured over 90 days of real abstracts:
+    # Terms are scoped PER THEME, taken from the "Monitoring topics" column the
+    # source doc gives for every journal. A single global list was tried first
+    # and failed in the first live run: a term qualifying for any theme admitted
+    # an article to every theme, so seven of eight articles were filed under
+    # "Lung Cancer & Occupational Exposures" and not one was about lung cancer
+    # (job strain and heart disease, night work and long-COVID, diabetes
+    # absenteeism, occupational health of caregivers).
     #
-    #   rule                        broad journals   focused journals
-    #   score >= 1                        14%              62%
-    #   score >= 2                         2%              13%
-    #   >=1 core, or >=2 total             2%              43%   <-- in use
+    # The theme an article is filed under is decided by its journal, so its
+    # content has to earn that heading.
     #
-    # A flat score>=1 passed 47% of Nature Climate Change (including a paper on
-    # marine species conservation, matched via "climate change") and a gynecology
-    # paper in Soc Sci & Med via "cumulative exposure". A flat score>=2 fixed that
-    # but discarded obviously relevant work — "Reducing respirable silica exposure
-    # among brick kiln workers", "Characterization of tremolite asbestos".
-    #
-    # CORE: inherently occupational or specific to her research. One match keeps
-    # the article, because these cannot really appear by coincidence.
-    "keywords_core": [
-        "occupational lung cancer",
-        "occupational cancer",
-        "occupational carcinogen",
-        "occupational exposure",
-        "occupational exposure limit",
-        "occupational disease",
-        "occupational exposome",
-        "occupational rehabilitation",
-        "occupational heat",
-        "occupational health policy",
-        "occupational data for health",
-        "never smoker",
-        "asbestos",
-        "silica",
-        "diesel exhaust",
-        "welding fume",
-        "time since exposure",
-        "time since last exposure",
-        "job exposure matrix",
-        "job exposure matrices",
-        "industry and occupation",
-        "exposure registry",
-        "disease notification",
-        "disease recognition",
-        "workers compensation",
-        "return to work",
-        "work ability",
-        "work retention",
-        "workplace accommodation",
-        "cancer survivorship",
-        # Added after the first live run, which dropped three unmistakably
-        # on-topic papers at score=0 purely because the vocabulary lacked the
-        # words: "Pesticides Exposure in Horticultural Work", "Occupational
-        # health risks among live-in caregivers", and a pneumoconiosis panel.
-        # These additions raised focused-journal recall from 43% to 55%.
-        "occupational health",
-        "occupational safety",
-        "occupational medicine",
-        "occupational hygiene",
-        "occupational risk",
-        "occupational lung disease",
-        "pneumoconiosis",
-        "silicosis",
-        "asbestosis",
-        "mesothelioma",
-        "pesticide",
-        "pesticides",
-        "carcinogenic",
-        # IARC classifies shift work involving circadian disruption as probably
-        # carcinogenic, so it belongs in an occupational cancer feed.
-        "shift work",
-        "night shift",
-    ],
-    # CONTEXT: real signal, but common enough outside her field that one alone
-    # means little. Needs keyword_min_score matches between them to carry an
-    # article on its own.
-    "keywords_context": [
-        "lung cancer",
-        "carcinogen",
-        "polycyclic aromatic hydrocarbon",
-        "pah",
-        "nickel",
-        "chromium",
-        "hexavalent chromium",
-        "combined exposure",
-        "cumulative exposure",
-        "sequential exposure",
-        "joint effect",
-        "additive interaction",
-        "multiplicative interaction",
-        "exposure response",
-        "dose response",
-        "latency",
-        "exposome",
-        "cancer surveillance",
-        "record linkage",
-        "data linkage",
-        "administrative data",
-        "electronic health record",
-        "ehr",
-        "natural language processing",
-        "disability management",
-        "heat stress",
-        "climate change",
-        "wildfire smoke",
-        "air pollution",
-        "extreme weather",
-        "extreme heat",
-        "exposure limit",
-        "regulatory policy",
-    ],
-    # Context-only articles need this many matches. Core matches bypass it.
+    # Within each theme:
+    #   core    — unmistakably that theme's subject; one match is enough.
+    #   context — real signal but weaker; needs keyword_min_score matches.
+    # The global occupational_anchors gate applies on top of both.
+    "themes": {
+        # א — the central research question: lung cancer from occupational
+        # carcinogens, combined exposures, never-smokers, latency. Exposure
+        # methodology (JEMs, exposome) is context rather than core: a JEM paper
+        # about ischaemic heart disease is methodologically interesting but is
+        # not this theme's subject, and needs a second term to qualify.
+        "Lung Cancer & Occupational Exposures": {
+            # No context-only path for this theme. Its context list contains
+            # exposure methodology (job exposure matrices, exposure assessment,
+            # exposome), and two of those pair with each other to admit a paper
+            # with no cancer or carcinogen content — which is exactly how a
+            # job-strain / ischaemic-heart-disease paper reached a lung cancer
+            # heading. An article must name a cancer, a carcinogen, or one of
+            # her agents to appear here.
+            "require_core": True,
+            "core": [
+                "lung cancer",
+                "occupational lung cancer",
+                "occupational cancer",
+                "occupational carcinogen",
+                "lung carcinogen",
+                "carcinogen",
+                "carcinogenic",
+                "asbestos",
+                "asbestosis",
+                "mesothelioma",
+                "silica",
+                "silicosis",
+                "diesel exhaust",
+                "polycyclic aromatic hydrocarbon",
+                "welding fume",
+                "hexavalent chromium",
+                "pneumoconiosis",
+                "occupational lung disease",
+                "occupational respiratory disease",
+                "never smoker",
+            ],
+            "context": [
+                "cancer",
+                "nickel",
+                "chromium",
+                "pah",
+                "exposure response",
+                "dose response",
+                "cumulative exposure",
+                "combined exposure",
+                "sequential exposure",
+                "joint effect",
+                "additive interaction",
+                "multiplicative interaction",
+                "latency",
+                "time since exposure",
+                "time since last exposure",
+                "occupational exposure",
+                "exposure assessment",
+                "exposure measurement",
+                "job exposure matrix",
+                "job exposure matrices",
+                "occupational exposome",
+                "exposome",
+                "cancer surveillance",
+                "cancer epidemiology",
+                "occupational disease",
+                "respirable dust",
+                "airborne exposure",
+            ],
+        },
+        # ב — Occupational Data for Health: getting industry and occupation into
+        # health records and reusing them for research.
+        "Occupational Data in Health Records": {
+            "core": [
+                "occupational data for health",
+                "industry and occupation",
+                "occupation coding",
+                "job coding",
+                "occupational history",
+                "work history",
+            ],
+            "context": [
+                "electronic health record",
+                "ehr",
+                "medical record",
+                "health record",
+                "natural language processing",
+                "nlp",
+                "record linkage",
+                "data linkage",
+                "administrative data",
+                "interoperability",
+                "clinical informatics",
+                "health informatics",
+                "data quality",
+                "registry",
+                "registries",
+                "structured data",
+                "coding",
+            ],
+        },
+        # ג — return to work, work retention and rehabilitation, including after
+        # cancer.
+        "Return to Work & Rehabilitation": {
+            "core": [
+                "return to work",
+                "work ability",
+                "work retention",
+                "workplace accommodation",
+                "occupational rehabilitation",
+                "vocational rehabilitation",
+                "disability management",
+                "work participation",
+                "work disability",
+                "sick leave",
+                "sickness absence",
+                "fitness for work",
+            ],
+            "context": [
+                "cancer survivorship",
+                "survivorship",
+                "employment outcome",
+                "employment",
+                "rehabilitation",
+                "functional capacity",
+                "work capacity",
+                "occupational therapy",
+                "workplace intervention",
+            ],
+        },
+        # ד — climate change as it reaches workers: heat, wildfire smoke, UV,
+        # extreme weather.
+        "Climate Change & Worker Health": {
+            "core": [
+                "occupational heat",
+                "heat stress",
+                "heat strain",
+                "heat exposure",
+                "wildfire smoke",
+                "outdoor worker",
+                "outdoor workers",
+                "thermal strain",
+                "thermal comfort",
+                "work capacity",
+            ],
+            "context": [
+                "climate change",
+                "extreme heat",
+                "extreme weather",
+                "ambient temperature",
+                "air pollution",
+                "ultraviolet",
+                "uv radiation",
+                "heat wave",
+                "heatwave",
+                "productivity loss",
+                "adaptation",
+            ],
+        },
+        # ה — regulation, exposure limits, disease recognition and compensation.
+        "Policy, Regulation & Health Systems": {
+            "core": [
+                "occupational exposure limit",
+                "occupational health policy",
+                "occupational safety and health",
+                "occupational health service",
+                "occupational health surveillance",
+                "disease notification",
+                "disease recognition",
+                "workers compensation",
+                "occupational injury",
+                "occupational disease",
+            ],
+            "context": [
+                "exposure limit",
+                "regulation",
+                "regulatory",
+                "legislation",
+                "enforcement",
+                "compensation",
+                "health policy",
+                "prevention policy",
+                "surveillance",
+                "governance",
+                "labour inspection",
+                "labor inspection",
+            ],
+        },
+    },
+    # Context-only articles need this many matches within their own theme.
+    # A single core match bypasses it.
     "keyword_min_score": 2,
 
     # Subject gate, applied BEFORE the topic rule above: an article must show

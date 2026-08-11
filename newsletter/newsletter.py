@@ -45,10 +45,12 @@ MAX_ARTICLES_PER_SUBJECT = EDITION["max_articles_per_subject"]
 #
 # All inert when both lists are empty, which is why the IIOSH edition is
 # unaffected by this stage.
-KEYWORDS_CORE = EDITION.get("keywords_core", [])
-KEYWORDS_CONTEXT = EDITION.get("keywords_context", [])
-KEYWORDS = KEYWORDS_CORE + KEYWORDS_CONTEXT
-KEYWORDS_CORE_SET = set(KEYWORDS_CORE)
+# Relevance terms are scoped PER THEME, not global. A global list lets a term
+# qualifying for any theme admit an article to every theme — which is how the
+# first live run filed seven articles under "Lung Cancer & Occupational
+# Exposures" without one of them being about lung cancer. Each theme carries the
+# monitoring topics its journals were selected for.
+THEMES = EDITION.get("themes", {})
 KEYWORD_MIN_SCORE = EDITION.get("keyword_min_score", 0)
 
 # A subject gate applied on top of the topic terms above. An edition whose
@@ -145,33 +147,45 @@ def normalize_text(text):
     return " " + re.sub(r"[^a-z0-9]+", " ", lowered).strip() + " "
 
 
-def keyword_score(title, abstract):
-    """Score an article against the edition's keyword lists.
+def keyword_score(title, abstract, subject):
+    """Score an article against the terms for the theme it would be filed under.
 
-    Returns (total distinct matches, core matches, occupational-anchor matches,
-    matched terms). Editions with no keywords always score 0 and are never
-    filtered — see gather_candidates.
+    Returns (total matches, core matches, occupational-anchor matches, matched
+    terms). Editions with no themes score 0 and are never filtered — see
+    gather_candidates.
+
+    Terms come from `subject`'s own list, so an article only counts toward the
+    theme it is actually being published under. Within a theme, `core` terms are
+    unmistakable on their own and `context` terms need corroboration.
     """
-    if not KEYWORDS:
+    if not THEMES:
         return 0, 0, 0, []
+    theme = THEMES.get(subject, {})
     haystack = normalize_text(f"{title} {abstract}")
-    matched = [term for term in KEYWORDS if f" {term} " in haystack]
-    core_hits = sum(1 for term in matched if term in KEYWORDS_CORE_SET)
+    core = [t for t in theme.get("core", []) if f" {t} " in haystack]
+    context = [t for t in theme.get("context", []) if f" {t} " in haystack]
     occ_hits = sum(1 for anchor in OCCUPATIONAL_ANCHORS if f" {anchor} " in haystack)
-    return len(matched), core_hits, occ_hits, matched
+    return len(core) + len(context), len(core), occ_hits, core + context
 
 
-def is_relevant(score, core_hits, occ_hits):
-    """Subject gate, then topic rule.
+def is_relevant(score, core_hits, occ_hits, subject=None):
+    """Subject gate, then the theme's own topic rule.
 
     The gate exists because topic terms alone are not sufficient evidence: a
     paper matching 'climate change' and 'air pollution' can be about a national
     health-system plan with no work content at all. Requiring an occupational
-    anchor first cut broad-journal noise from 3.0% to 1.3% while costing only
-    four points of recall on the focused journals.
+    anchor first cut broad-journal noise from 3.0% to 1.3%.
+
+    A theme may set `require_core`, which disables the context-only path. Theme א
+    needs it: its context terms include exposure methodology (JEMs, exposure
+    assessment, exposome), and two of those can pair with each other to admit a
+    paper with no cancer or carcinogen content at all — which is how a job-strain
+    and ischaemic-heart-disease paper reached a lung cancer heading.
     """
     if OCCUPATIONAL_ANCHORS and occ_hits < 1:
         return False
+    if subject and THEMES.get(subject, {}).get("require_core"):
+        return core_hits >= 1
     return core_hits >= 1 or score >= KEYWORD_MIN_SCORE
 
 
@@ -338,9 +352,9 @@ def gather_candidates(journal_entries, subject):
             # Relevance gate. Runs before any Gemini call, so an off-topic paper
             # never costs a summarization request. Inert when the edition has no
             # keywords, which is why the IIOSH edition is unaffected.
-            if KEYWORDS:
-                score, core_hits, occ_hits, matched = keyword_score(title, raw_abstract)
-                keep = is_relevant(score, core_hits, occ_hits)
+            if THEMES:
+                score, core_hits, occ_hits, matched = keyword_score(title, raw_abstract, subject)
+                keep = is_relevant(score, core_hits, occ_hits, subject)
                 # Every candidate is logged, rejects included, so the rule can be
                 # retuned from observed scores rather than guessed at. occ=0 on a
                 # dropped row means it failed the subject gate, not the topic rule.
