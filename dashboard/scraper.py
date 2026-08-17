@@ -1,12 +1,18 @@
 import requests
 import pandas as pd
 import gspread
+from gspread.utils import rowcol_to_a1
 import google.auth
 import time
 import datetime
 
 # --- 1. CONFIGURATION ---
 GOOGLE_SHEET_NAME = "IIOSH Dashboard Data"
+
+# Statuses worth waiting out: 429 (rate limit) plus the 5xx family Google's
+# frontend returns while a backend is briefly unavailable. Same set as
+# fetch_openalex in newsletter/newsletter.py.
+TRANSIENT_STATUSES = (429, 500, 502, 503, 504)
 
 # Calculate the current year dynamically for the API filter
 CURRENT_YEAR = datetime.datetime.now().year
@@ -109,20 +115,94 @@ def fetch_all_recent_articles(issn, config):
     print(f"  -> Fetched {len(parsed_articles)} articles.")
     return parsed_articles
 
+def retry_reason(error):
+    """Describe why `error` is worth retrying, or return None if it isn't.
+
+    Prefers the HTTP status on the underlying response over gspread's
+    APIError.code: the latter is parsed from a JSON error body, and Google's
+    503s often arrive as an HTML or plain-text page, which leaves .code at -1.
+    """
+    if isinstance(error, (requests.exceptions.ConnectionError,
+                          requests.exceptions.Timeout)):
+        return "connection error"
+
+    response = getattr(error, "response", None)
+    status = getattr(response, "status_code", None)
+    if status is None:
+        status = getattr(error, "code", None)
+    return f"HTTP {status}" if status in TRANSIENT_STATUSES else None
+
+
+def with_retry(description, operation, max_retries=5):
+    """Run a Google API call, retrying transient failures with backoff.
+
+    Returns the operation's result. Re-raises the last error once the retries
+    are exhausted, and re-raises immediately for anything non-transient (401/403
+    bad credentials, 404 renamed sheet), where waiting cannot help. Logs with a
+    [DIAG] prefix so attempts are traceable in the CI logs.
+    """
+    backoff = 5
+    for attempt in range(1, max_retries + 1):
+        try:
+            return operation()
+        except Exception as e:
+            reason = retry_reason(e)
+            print(f"[DIAG] {description} attempt {attempt}/{max_retries} -> {e}", flush=True)
+
+            if reason is None or attempt == max_retries:
+                raise
+
+            response = getattr(e, "response", None)
+            retry_after = getattr(response, "headers", {}).get("Retry-After", "")
+            wait = int(retry_after) if retry_after.isdigit() else backoff
+            print(f"[DIAG]   transient ({reason}), retrying in {wait}s...", flush=True)
+            time.sleep(wait)
+            backoff *= 2
+
+
 def update_google_sheet(dataframe):
     """Pushes the Pandas DataFrame to Google Sheets using Workload Identity (ADC)."""
     print(f"\nConnecting to Google Sheets to upload {len(dataframe)} rows...")
-    
+
     credentials, _ = google.auth.default(scopes=[
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ])
-    
+
     client = gspread.authorize(credentials)
-    sheet = client.open(GOOGLE_SHEET_NAME).sheet1
-    
-    sheet.clear()
-    sheet.update([dataframe.columns.values.tolist()] + dataframe.values.tolist())
+    sheet = with_retry(
+        f"open '{GOOGLE_SHEET_NAME}'",
+        lambda: client.open(GOOGLE_SHEET_NAME).sheet1)
+
+    values = [dataframe.columns.values.tolist()] + dataframe.values.tolist()
+    rows_needed, cols_needed = len(values), len(values[0])
+
+    # Grid size before the write, for the trailing-row cleanup below. Both
+    # counts are read from the metadata gspread already fetched, so this costs
+    # no extra API call.
+    previous_rows = sheet.row_count
+
+    # An update() reaching past the grid edge fails outright rather than
+    # expanding it, and this sheet grows by a few hundred rows every week.
+    if previous_rows < rows_needed or sheet.col_count < cols_needed:
+        with_retry("grow grid", lambda: sheet.resize(
+            rows=max(previous_rows, rows_needed),
+            cols=max(sheet.col_count, cols_needed)))
+
+    # Overwrite in place *before* removing anything, rather than the previous
+    # clear()-then-update(). A failure between those two calls left the
+    # dashboard blank until the next successful run; the worst case now is
+    # leftover stale rows, which the batch_clear below removes.
+    with_retry(f"write {rows_needed} rows", lambda: sheet.update(values))
+
+    # Last week's data below the new final row would otherwise linger. Clearing
+    # by grid height rather than the true data extent reaches into rows that are
+    # already empty, which is harmless and avoids downloading the old sheet.
+    if previous_rows > rows_needed:
+        trailing = f"A{rows_needed + 1}:{rowcol_to_a1(previous_rows, cols_needed)}"
+        with_retry(f"clear stale rows {trailing}",
+                   lambda: sheet.batch_clear([trailing]))
+
     print(f"Successfully uploaded {len(dataframe)} rows to '{GOOGLE_SHEET_NAME}'!")
 
 # --- MAIN EXECUTION ---
