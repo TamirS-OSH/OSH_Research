@@ -1,17 +1,19 @@
 name: IIOSH Weekly Automation
-run-name: ${{ inputs.dry_run && 'IIOSH Weekly Automation (dry run)' || 'IIOSH Weekly Automation' }}
+run-name: ${{ inputs.dry_run_email != '' && 'IIOSH Weekly Automation (dry run)' || 'IIOSH Weekly Automation' }}
 
-# dry_run defaults to false, so the weekly Apps Script trigger (which sends no
-# inputs) runs for real. A dry run still updates the dashboard (a full rewrite,
-# safe to repeat) and builds the newsletter, but emails no one and publishes
-# nothing to Pages; the newsletter is attached to the run as an artifact instead.
+# Filling dry_run_email makes it a dry run: the dashboard still updates (a full
+# rewrite, safe to repeat), but the newsletter goes ONLY to that address and is
+# published under /preview instead of replacing the public homepage. A single
+# field (rather than a checkbox plus an address) means a dry run can't be half
+# set up. Empty by default, so the Apps Script trigger (no inputs) runs for real.
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: 'Dry run: no email, no Pages publish (newsletter attached to the run instead)'
-        type: boolean
-        default: false
+      dry_run_email:
+        description: 'DRY RUN: your email address. Only you get the newsletter. Leave EMPTY for a real run to all recipients.'
+        type: string
+        required: false
+        default: ''
 
 jobs:
   update-dashboard:
@@ -61,14 +63,33 @@ jobs:
       - name: Install Dependencies
         run: pip install -r newsletter/requirements.txt
 
+      # The repo is public, so the address is read from the event payload (never
+      # echoed in a script or env listing) and masked before anything logs it.
+      - name: Read dry-run address
+        id: mode
+        run: |
+          addr=$(jq -r '.inputs.dry_run_email // ""' "$GITHUB_EVENT_PATH" | tr -d '[:space:]')
+          if [ -z "$addr" ]; then
+            echo "Real run: newsletter goes to the full recipient list."
+            exit 0
+          fi
+          echo "::add-mask::$addr"
+          if ! [[ "$addr" =~ ^[^@,]+@[^@,]+\.[^@,]+$ ]]; then
+            echo "::error::dry_run_email must be a single email address."
+            exit 1
+          fi
+          echo "DRY_RUN_EMAIL=$addr" >> "$GITHUB_ENV"
+          echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          echo "Dry run: newsletter goes only to the address given, published under /preview."
+
       - name: Generate Newsletter & Send Email
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_LIST: ${{ secrets.RECIPIENT_LIST }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research'
+          # Dry-run emails link to the /preview copy, so their buttons work too.
+          PAGE_BASE_URL: ${{ steps.mode.outputs.dry_run == 'true' && 'https://tamirs-osh.github.io/OSH_Research/preview' || 'https://tamirs-osh.github.io/OSH_Research' }}
           # Contact email for OpenAlex "polite pool" (reuses existing secret).
           OPENALEX_MAILTO: ${{ secrets.GMAIL_USER }}
           # Stream Python output live so [DIAG] lines are timestamped correctly.
@@ -91,17 +112,19 @@ jobs:
           cp "$latest" pages_output/index.html
           echo "produced=true" >> "$GITHUB_OUTPUT"
 
-      - name: Attach newsletter preview (dry run)
-        if: steps.prep.outputs.produced == 'true' && inputs.dry_run
-        uses: actions/upload-artifact@v4
-        with:
-          name: newsletter-preview
-          path: pages_output/IIOSH_Research_Update_*.html
-
       - name: Deploy to GitHub Pages
-        if: steps.prep.outputs.produced == 'true' && !inputs.dry_run
+        if: steps.prep.outputs.produced == 'true' && steps.mode.outputs.dry_run != 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./pages_output
+          keep_files: true
+
+      - name: Deploy dry-run preview to GitHub Pages (/preview)
+        if: steps.prep.outputs.produced == 'true' && steps.mode.outputs.dry_run == 'true'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages_output
+          destination_dir: preview
           keep_files: true

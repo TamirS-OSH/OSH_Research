@@ -565,8 +565,14 @@ if __name__ == "__main__":
         recipient_str = os.environ.get("RECIPIENT_LIST", "")
         recipients = [r.strip() for r in recipient_str.split(",") if r.strip()]
 
-        if os.environ.get("DRY_RUN", "").lower() == "true":
-            print(f"DRY RUN: email not sent (would have gone to {len(recipients)} recipients).")
+        dry_run_email = os.environ.get("DRY_RUN_EMAIL", "").strip()
+        if dry_run_email:
+            print(f"DRY RUN: sending only to the dry-run address (a real run would go to {len(recipients)} recipients).")
+            send_email(
+                "[DRY RUN] IIOSH Weekly Research Update | לקט מחקרים שבועי",
+                email_body,
+                [dry_run_email]
+            )
         elif recipients:
             send_email(
                 "IIOSH Weekly Research Update | לקט מחקרים שבועי",

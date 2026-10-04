@@ -121,7 +121,7 @@ function triggerWeeklyNewsletter() {
 
 ### Dry Run (Manual Testing)
 
-Actions → **IIOSH Weekly Automation** → **Run workflow** → tick **dry_run**. The dashboard updates as usual (a full rewrite, safe to repeat) and the newsletter is generated with real AI summaries, but **no email is sent and nothing is published to Pages**. The log says `DRY RUN: email not sent (would have gone to N recipients)`, and the newsletter HTML is attached to the run as the `newsletter-preview` artifact. `dry_run` defaults to off, so the Apps Script trigger (which sends no inputs) always runs for real.
+Actions → **IIOSH Weekly Automation** → **Run workflow** → enter your address in **dry_run_email**. The dashboard updates as usual (a full rewrite, safe to repeat) and the newsletter is generated with real AI summaries, but the email — subject prefixed `[DRY RUN]` — goes **only to that address**, and the page is published under `/preview/` instead of replacing the public homepage, so the email's links work. The log says `DRY RUN: sending only to the dry-run address (a real run would go to N recipients)`; the address itself is masked in the (public) logs. Leaving the field empty is a real run, which is also what the Apps Script trigger does.
 
 ## License
 
