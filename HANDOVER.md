@@ -6,6 +6,15 @@ How to pass this automation to a new maintainer so it keeps running after the de
 
 > This repository is public. Never write passwords, tokens, recovery codes or the recipient list into this file or anywhere else in the repo.
 
+## Progress
+
+**As of 2026-10-04 (evening):** Parts 1–4 have been worked through, and the account is renamed to `iiosh-research` (lowercase). **Next: Part 5 (weekly trigger), not started.** Open items, in order:
+
+1. **Before Sunday 2026-10-11, about 09:45 Israel time:** either do Part 5, or update the old trigger's URL to `iiosh-research` (Part 4, step 2). It still says `TamirS-OSH`, a name that no longer exists, so Sunday's run may not start.
+2. **No dry run has run since the rename and the Part 3 variables.** Run one ([Part 10](#part-10--verify)) and check both jobs are green.
+3. **If the dashboard job fails at *Authenticate to Google Cloud*:** the Google login in Part 3, step 4 must name `iiosh-research/OSH_Research` in lowercase (both the attribute condition and the Grant access value). Google compares names letter for letter, case included.
+4. **Check which way the Sheet moved to `iiosh.news`** (Part 6). If the old `journal-dashboard-bot@research-497406…` service account appears in its Share dialog, ownership was transferred (Plan A). If not, it's a copy (Plan B), and the job and Looker are still using the old Sheet. Then do Part 7 to match.
+
 ---
 
 ## The idea in one paragraph
@@ -105,10 +114,10 @@ The workflow reads the project details from two **repository variables** (step 6
    - [ ] Provider: **OpenID Connect (OIDC)** · Provider name `github-provider` (ID `github-provider`) · Issuer URL `https://token.actions.githubusercontent.com` · Audiences: **Default audience** → Continue.
    - [ ] Attribute mapping: `google.subject` = `assertion.sub`; **Add mapping**: `attribute.repository` = `assertion.repository`.
    - [ ] **Attribute conditions → Add condition**. Allow both the current and the new account name, since the rename (Part 4) comes after this:
-     `assertion.repository in ['TamirS-OSH/OSH_Research', 'IIOSH-Research/OSH_Research']`
+     `assertion.repository in ['TamirS-OSH/OSH_Research', 'iiosh-research/OSH_Research']`
    - [ ] Save.
    - [ ] On the pool's page → **Grant access** → *Grant access using service account impersonation* → Service account `journal-dashboard-bot` → Select principals: **Only identities matching the filter** → Attribute name `repository`, value `TamirS-OSH/OSH_Research` → Save. If a "Configure your application" window appears, close it.
-   - [ ] Repeat **Grant access** with the value `IIOSH-Research/OSH_Research`.
+   - [ ] Repeat **Grant access** with the value `iiosh-research/OSH_Research`. **Google compares these names letter for letter, including upper/lower case, and the account name is all lowercase (`iiosh-research`).**
 5. **Share the Sheet with the new service account.**
    - [ ] Whoever can share the Sheet (the departing maintainer until Part 6 is done) opens *IIOSH Dashboard Data* → **Share** → add `journal-dashboard-bot@<PROJECT_ID>.iam.gserviceaccount.com` as **Editor** → untick "Notify people" → Share.
 6. **Point the workflow at the new project.** On GitHub: repo → Settings → Secrets and variables → Actions → **Variables** tab → **New repository variable**, twice:
@@ -146,7 +155,7 @@ The old name `TamirS-OSH` becomes free for anyone to register. If someone does, 
    - [ ] Update the old name in the docs. Use GitHub's search in the repo for `tamirs-osh` (`README.md` and the default in `newsletter/newsletter.py`, which only matters when running locally), edit each one on GitHub, and commit.
    - [ ] On any computer with a copy of the repo: `git remote set-url origin https://github.com/IIOSH-Research/OSH_Research.git`. Optional, since the old address redirects.
 3. **After the first successful real Sunday run ([Part 10](#part-10--verify)), tighten the Google login to the new name only.** In the new project (signed in as `iiosh.news@gmail.com`):
-   - [ ] IAM & Admin → Workload Identity Federation → `github-actions-pool` → `github-provider` → Edit → change the attribute condition to `assertion.repository == 'IIOSH-Research/OSH_Research'` → Save.
+   - [ ] IAM & Admin → Workload Identity Federation → `github-actions-pool` → `github-provider` → Edit → change the attribute condition to `assertion.repository == 'iiosh-research/OSH_Research'` → Save.
    - [ ] IAM & Admin → Service Accounts → `journal-dashboard-bot` → **Principals with access**: delete the entry ending in `attribute.repository/TamirS-OSH/OSH_Research`.
 
 ## Part 5 — Weekly trigger (Apps Script)
