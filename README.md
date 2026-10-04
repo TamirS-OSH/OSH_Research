@@ -1,6 +1,6 @@
 # Research Automation
 
-Automated research monitoring pipeline for browsing occupational safety and hygiene literature. Tracks new academic publications across 39 target journals in occupational health, safety, ergonomics, and related fields — then delivers insights via a weekly newsletter ([Example](https://tamirs-osh.github.io/OSH_Research/IIOSH_Research_Update_2026-06-25.html)) and a live [Dashboard](https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2).
+Automated research monitoring pipeline for browsing occupational safety and hygiene literature. Tracks new academic publications across 46 target journals in occupational health, safety, ergonomics, and related fields — then delivers insights via a weekly newsletter ([Example](https://tamirs-osh.github.io/OSH_Research/IIOSH_Research_Update_2026-06-25.html)) and a live [Dashboard](https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2).
 
 ## What It Does
 
@@ -21,7 +21,7 @@ A weekly scraper that fetches article metadata (title, journal, DOI, publication
 
 | Domain | Journals Tracked |
 |---|---|
-| Occupational Health | 7 |
+| Occupational Health | 10 |
 | Occupational Safety | 6 |
 | Occupational Hygiene | 4 |
 | Occupational Health & Stress | 2 |
@@ -29,6 +29,9 @@ A weekly scraper that fetches article metadata (title, journal, DOI, publication
 | General & Physical Ergonomics | 5 |
 | Musculoskeletal Health & Biomechanics | 5 |
 | Cognitive Ergonomics & HCI | 5 |
+| Public & Environmental Health | 4 |
+
+The Public & Environmental Health journals (Respirology, Medical Journal of Australia, Journal of Climate Change and Health, ANZ Journal of Public Health) are general rather than occupational. The dashboard archives all their articles; the newsletter keeps only work-related ones — a work term (e.g. *workers*, *occupational*, *silica*) in the title, or at least 3 in the abstract (`is_work_related()` in `newsletter.py`). Expect this domain in roughly one newsletter every 4–6 weeks.
 
 ## Repository Structure
 
@@ -75,10 +78,10 @@ scripts_archive/           # Superseded scripts kept for reference
 | `GMAIL_APP_PASSWORD` | Gmail App Password (not the account password) |
 | `RECIPIENT_LIST` | Comma-separated recipient email addresses |
 
+GitHub never shows a secret's value again, and updating it replaces the whole list. Keep the list in `newsletter/recipients.txt` (git-ignored, one address per line), then run `.\newsletter\copy_recipients.ps1` to check it and copy the comma-separated value for pasting into the secret.
+
 ### GitHub Pages
 Enable Pages in repo Settings → Pages → Deploy from branch → `gh-pages` / `/ (root)`.
-
-GitHub never shows a secret's value again, and updating it replaces the whole list. Keep the list in `newsletter/recipients.txt` (git-ignored, one address per line), then run `.\newsletter\copy_recipients.ps1` to check it and copy the comma-separated value for pasting into the secret.
 
 ### Scheduling (Automated Trigger)
 

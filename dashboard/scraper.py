@@ -72,7 +72,19 @@ JOURNAL_MAPPING = {
     "2168-2291": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
     "1044-7318": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
     "1436-6556": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
-    "1520-6564": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"}
+    "1520-6564": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
+
+    # Added Oct 2026 (grades from SJR 2024)
+    "0962-7480": {"subject": "Occupational Health", "grade": "Q2"},  # Occupational Medicine
+    "0019-8366": {"subject": "Occupational Health", "grade": "Q2"},  # Industrial Health
+    "1048-2911": {"subject": "Occupational Health", "grade": "Q2"},  # New Solutions
+
+    # 9. Public & Environmental Health (general journals; the newsletter keeps
+    # only their work-related articles, the dashboard archives everything)
+    "1323-7799": {"subject": "Public & Environmental Health", "grade": "Q1"},  # Respirology
+    "0025-729X": {"subject": "Public & Environmental Health", "grade": "Q1"},  # Medical Journal of Australia
+    "2667-2782": {"subject": "Public & Environmental Health", "grade": "Q1"},  # J Climate Change and Health
+    "1326-0200": {"subject": "Public & Environmental Health", "grade": "Q2"}   # ANZ J Public Health
 }
 
 def fetch_all_recent_articles(issn, config):

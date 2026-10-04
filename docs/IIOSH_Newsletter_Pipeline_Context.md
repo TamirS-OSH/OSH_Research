@@ -1,7 +1,7 @@
 # Context: IIOSH Automated Weekly Newsletter Pipeline
 
 ## 📌 Project Overview
-The Israel Institute for Occupational Safety and Hygiene (IIOSH) utilizes an automated Python pipeline (`newsletter/newsletter.py`) to generate a weekly, bilingual (English & Hebrew) research newsletter. The script queries the **OpenAlex API** for fresh academic papers across 39 target journals, processes the abstracts using the **Google Gemini API**, and outputs a highly polished, responsive HTML file designed to be copy-pasted directly into Microsoft Outlook.
+The Israel Institute for Occupational Safety and Hygiene (IIOSH) utilizes an automated Python pipeline (`newsletter/newsletter.py`) to generate a weekly, bilingual (English & Hebrew) research newsletter. The script queries the **OpenAlex API** for fresh academic papers across 46 target journals, processes the abstracts using the **Google Gemini API**, and outputs a highly polished, responsive HTML file designed to be copy-pasted directly into Microsoft Outlook.
 
 ---
 
