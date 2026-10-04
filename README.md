@@ -59,6 +59,7 @@ docs/
   Looker_Studio_Dashboard_Context.md
   IIOSH_Newsletter_Pipeline_Context.md
 scripts_archive/           # Superseded scripts kept for reference
+HANDOVER.md                # Passing the automation to a new maintainer, plus maintenance and troubleshooting
 ```
 
 ## Tech Stack
@@ -127,7 +128,7 @@ function triggerWeeklyNewsletter() {
 ```
 
 > **⚠️ Maintenance — the token expires.** Fine-grained GitHub PATs last up to ~1 year. When this one expires the Apps Script trigger will start failing and the newsletter will **silently stop going out**. To stay ahead of it:
-> - Enable the trigger's **failure-notification email** (Apps Script → Triggers → the trigger → *Notify me immediately*) so a lapse is caught early.
+> - Enable the trigger's **failure-notification email** (Apps Script → Triggers → the trigger → *Notify me immediately*) so a lapse is caught early. This only fires if the function **throws** on a non-204 response. The snippet above only logs it, so use the version in [HANDOVER.md](HANDOVER.md#part-5--weekly-trigger-apps-script), which also adds a safe `testDryRun`.
 > - Before expiry, generate a fresh PAT (same scope), paste it into the `setGithubToken` helper, run that function once, then blank the literal back out of the source.
 
 ### Dry Run (Manual Testing)

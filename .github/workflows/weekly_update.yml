@@ -27,12 +27,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Set GCP_WIF_PROVIDER / GCP_SERVICE_ACCOUNT under Settings → Secrets and
+      # variables → Actions → Variables to point at another Google Cloud project
+      # (see HANDOVER.md, Part 3). Unset, they fall back to the original project.
       - name: Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/142538704961/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
-          service_account: 'journal-dashboard-bot@research-497406.iam.gserviceaccount.com'
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER || 'projects/142538704961/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider' }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT || 'journal-dashboard-bot@research-497406.iam.gserviceaccount.com' }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -65,12 +68,17 @@ jobs:
 
       # The repo is public, so the address is read from the event payload (never
       # echoed in a script or env listing) and masked before anything logs it.
+      # The Pages address is built from the account and repo names, so renaming
+      # the GitHub account needs no code change. Dry-run emails link to the
+      # /preview copy, so their buttons work too.
       - name: Read dry-run address
         id: mode
         run: |
+          base="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}"
           addr=$(jq -r '.inputs.dry_run_email // ""' "$GITHUB_EVENT_PATH" | tr -d '[:space:]')
           if [ -z "$addr" ]; then
-            echo "Real run: newsletter goes to the full recipient list."
+            echo "page_url=$base" >> "$GITHUB_OUTPUT"
+            echo "Real run: newsletter goes to the full recipient list. Links point to $base"
             exit 0
           fi
           echo "::add-mask::$addr"
@@ -80,7 +88,8 @@ jobs:
           fi
           echo "DRY_RUN_EMAIL=$addr" >> "$GITHUB_ENV"
           echo "dry_run=true" >> "$GITHUB_OUTPUT"
-          echo "Dry run: newsletter goes only to the address given, published under /preview."
+          echo "page_url=$base/preview" >> "$GITHUB_OUTPUT"
+          echo "Dry run: newsletter goes only to the address given, published under /preview. Links point to $base/preview"
 
       - name: Generate Newsletter & Send Email
         env:
@@ -88,8 +97,7 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_LIST: ${{ secrets.RECIPIENT_LIST }}
-          # Dry-run emails link to the /preview copy, so their buttons work too.
-          PAGE_BASE_URL: ${{ steps.mode.outputs.dry_run == 'true' && 'https://tamirs-osh.github.io/OSH_Research/preview' || 'https://tamirs-osh.github.io/OSH_Research' }}
+          PAGE_BASE_URL: ${{ steps.mode.outputs.page_url }}
           # Contact email for OpenAlex "polite pool" (reuses existing secret).
           OPENALEX_MAILTO: ${{ secrets.GMAIL_USER }}
           # Stream Python output live so [DIAG] lines are timestamped correctly.
