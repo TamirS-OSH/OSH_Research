@@ -13,6 +13,7 @@ The goal of this dashboard is to provide the IIOSH research team with a centrali
 * **Backend:** A Python script (`dashboard/scraper.py`) queries the **OpenAlex API** globally for new publications using standard journal ISSNs.
 * **Storage:** The raw metadata (Title, Journal Name, DOI Link, Publication Date, Subject Domain, and Journal Quality Grade) is pushed to the "IIOSH Dashboard Data" Google Sheet.
 * **Visualization:** Looker Studio connects directly to this Google Sheet as its live data source.
+* **⚠️ The "Journal Metadata" tab (maintained by hand):** A second tab in the same Sheet, with two columns, `Journal Name` and `Journal Grade`. It was filled once by `scripts_archive/Grades_addition.py` and is **not** updated by any automation. Looker joins the article rows to this tab by **exact** `Journal Name`, and the grade shown in the dashboard comes from here, not from the scraper's own `Grade` column. **A journal missing from this tab is hidden from the dashboard entirely**, even though its articles are in the Sheet. This was confirmed on 2026-10-04: the 7 journals added that day uploaded 4,353 rows, but the dashboard still showed 22,045 records, the old-journals-only total, until their rows were added here. Afterwards it showed 26,398.
 
 ### 2. Embedded Fields & Data Schema
 The underlying data table fed into Looker Studio contains the following structured fields:
@@ -21,7 +22,17 @@ The underlying data table fed into Looker Studio contains the following structur
 * `DOI / ID Link`: Clickable URL linking directly to the full text on the publisher's site.
 * `Publication Date`: Year-Month-Day formatting to track historical trends.
 * `Subject Domain`: One of our specific internal IIOSH research categories (e.g., *Occupational Safety, Occupational Health, Occupational Hygiene, Musculoskeletal Health, Applied Psych & Org Behavior, Cognitive Ergonomics & HCI, General & Physical Ergonomics, Public & Environmental Health*).
-* `Grade`: The journal ranking metrics (**Q1** or **Q2**) mapped internally via specialized journal dictionaries.
+* `Journal Grade`: The journal's quartile (**Q1**, **Q1/Q2** or **Q2**), joined in from the **Journal Metadata** tab (see above). The scraper also writes a `Grade` column, but the original journals are all marked `Q1` there, and the dashboard doesn't display it.
+
+### 3. Adding a Journal to the Dashboard
+1. Add its ISSN to `JOURNAL_MAPPING` in `dashboard/scraper.py`. The newsletter keeps its own separate list in `newsletter/newsletter.py` on purpose, so update both when a journal should be in both.
+2. Add a row to the **Journal Metadata** tab, with `Journal Name` exactly as OpenAlex displays it (`primary_location.source.display_name`, e.g. `NEW SOLUTIONS A Journal of Environmental and Occupational Health Policy`) and its grade. Without this row, the journal stays invisible.
+3. Verify the ISSN resolves in OpenAlex (`https://api.openalex.org/sources/issn:<ISSN>`). A mistyped ISSN fails silently: the scraper logs `Fetched 0 articles` and carries on. Cognition, Technology & Work sat at 0 for months under the non-existent ISSN 1436-6556 before being corrected to 1435-5558.
+4. After the next run, click **Refresh data** in Looker and check that the record count rose by about the number of articles the log reports for the new journal.
+
+### 4. Data Notes
+* The scraper pulls everything since 2024, **unfiltered**. That includes the 4 general Public & Environmental Health journals, which the newsletter filters for work relevance but the dashboard does not.
+* Occupational Medicine's 2024 *Supplement_1* (~1,460 conference abstracts) is included **deliberately**. The maintainer chose to keep it. Spikes in the "Publish count by date" chart are such bulk issue or supplement dates.
 
 ---
 
@@ -41,7 +52,7 @@ To prevent information overload, the dashboard relies heavily on active user con
 ---
 
 ## 📂 scripts_archive/
-The `scripts_archive/` folder contains old, superseded scripts kept in the repo for reference. These are **not** part of any active pipeline. They include earlier versions of the scraper (daily and weekly variants using `gspread.oauth()`), a one-off journal metadata uploader, and an HTML CSS redesigner.
+The `scripts_archive/` folder contains old, superseded scripts kept in the repo for reference. These are **not** part of any active pipeline. They include earlier versions of the scraper (daily and weekly variants using `gspread.oauth()`), a one-off journal metadata uploader (`Grades_addition.py`, which created the **Journal Metadata** tab; it uses interactive OAuth, so adding rows by hand is simpler), and an HTML CSS redesigner.
 
 ---
 
@@ -81,9 +92,9 @@ While the **Looker Studio Dashboard** acts as the permanent, searchable *histori
 ✅ Phase 4: Deployment (Completed)
 [x] Commit Files: Pushed dashboard/scraper.py, dashboard/requirements.txt, and .github/workflows/weekly_update.yml to the GitHub repository.
 
-[ ] Test the Action: Go to the Actions tab in your GitHub repository, select the "Weekly Looker Studio Data Pull" workflow, and click Run workflow to test it manually.
+[x] Test the Action: Runs weekly. A manual end-to-end dry run was verified on 2026-10-04 (see the README's *Dry Run* section).
 
-[ ] Verify: Check the Looker Studio dashboard to ensure the data updated correctly without errors.
+[x] Verify: Dashboard confirmed updating on 2026-10-04, after the Journal Metadata rows for the new journals were added.
 
 ✅ Phase 5: Scheduling Pivot — External Trigger (Completed)
 [x] Root Cause: GitHub Actions' native `schedule:` (cron) trigger never fired for this repo — confirmed by a diagnostic test showing 0 schedule-event runs across multiple clean cron ticks, despite a valid, active workflow on the default branch. Manual `workflow_dispatch` runs always worked, so the pipeline code was never the problem.

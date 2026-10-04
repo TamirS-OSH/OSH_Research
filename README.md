@@ -33,6 +33,15 @@ A weekly scraper that fetches article metadata (title, journal, DOI, publication
 
 The Public & Environmental Health journals (Respirology, Medical Journal of Australia, Journal of Climate Change and Health, ANZ Journal of Public Health) are general rather than occupational. The dashboard archives all their articles; the newsletter keeps only work-related ones — a work term (e.g. *workers*, *occupational*, *silica*) in the title, or at least 3 in the abstract (`is_work_related()` in `newsletter.py`). Expect this domain in roughly one newsletter every 4–6 weeks.
 
+### Adding a Journal
+The newsletter and the dashboard keep **separate** journal lists on purpose, so each automation can differ (grades, filters). Adding a journal to both takes four places:
+1. `newsletter/newsletter.py` → `JOURNAL_MAPPING` (`Subject`, `Grade`, and `"WorkFilter": True` for a non-occupational journal).
+2. `dashboard/scraper.py` → `JOURNAL_MAPPING`.
+3. The **Journal Metadata** tab of the *IIOSH Dashboard Data* Google Sheet: one row with the journal's exact OpenAlex display name and grade. **Without it, the journal is invisible in Looker Studio.** See [the dashboard doc](docs/Looker_Studio_Dashboard_Context.md).
+4. The journal counts in this README and in `docs/`.
+
+Check every ISSN at `https://api.openalex.org/sources/issn:<ISSN>` first, because a wrong ISSN fails silently and returns 0 articles. Grades come from SJR (scimagojr.com). Within each grade tier, the newsletter takes articles round-robin across a domain's journals, so adding a journal doesn't let it crowd out the others.
+
 ## Repository Structure
 
 ```
@@ -44,6 +53,8 @@ dashboard/
 newsletter/
   newsletter.py            # OpenAlex → Gemini → HTML + email pipeline
   requirements.txt
+  copy_recipients.ps1      # Validates recipients.txt and copies it for the RECIPIENT_LIST secret
+  recipients.txt           # (git-ignored, local only) the recipient list, one address per line
 docs/
   Looker_Studio_Dashboard_Context.md
   IIOSH_Newsletter_Pipeline_Context.md
@@ -122,6 +133,9 @@ function triggerWeeklyNewsletter() {
 ### Dry Run (Manual Testing)
 
 Actions → **IIOSH Weekly Automation** → **Run workflow** → enter your address in **dry_run_email**. The dashboard updates as usual (a full rewrite, safe to repeat) and the newsletter is generated with real AI summaries, but the email — subject prefixed `[DRY RUN]` — goes **only to that address**, and the page is published under `/preview/` instead of replacing the public homepage, so the email's links work. The log says `DRY RUN: sending only to the dry-run address (a real run would go to N recipients)`; the address itself is masked in the (public) logs. Leaving the field empty is a real run, which is also what the Apps Script trigger does.
+
+- **If the `dry_run_email` field doesn't appear** in the Run workflow form, hard-refresh the page (Ctrl+F5). The form can be stale after the workflow file changes. Don't click Run without seeing the field.
+- **Stopping a mistaken real run:** the email is the last thing the newsletter step does, typically **10–15 minutes** after the run starts. Open the run and click **Cancel workflow** before then, and no one is emailed. Cancelling is safe for the dashboard and Pages too: the next run rewrites the Sheet, and Pages publishes only after the email. A real run is recognisable by its name, which lacks "(dry run)", and by the *Read dry-run address* step logging "Real run".
 
 ## License
 
