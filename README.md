@@ -78,6 +78,8 @@ scripts_archive/           # Superseded scripts kept for reference
 ### GitHub Pages
 Enable Pages in repo Settings → Pages → Deploy from branch → `gh-pages` / `/ (root)`.
 
+GitHub never shows a secret's value again, and updating it replaces the whole list. Keep the list in `newsletter/recipients.txt` (git-ignored, one address per line), then run `.\newsletter\copy_recipients.ps1` to check it and copy the comma-separated value for pasting into the secret.
+
 ### Scheduling (Automated Trigger)
 
 GitHub Actions' native `schedule:` (cron) trigger proved **unreliable** for this repo — it never fired a single scheduled run despite a valid, active workflow on the default branch. Weekly execution is therefore driven **externally**:
