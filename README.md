@@ -119,6 +119,10 @@ function triggerWeeklyNewsletter() {
 > - Enable the trigger's **failure-notification email** (Apps Script → Triggers → the trigger → *Notify me immediately*) so a lapse is caught early.
 > - Before expiry, generate a fresh PAT (same scope), paste it into the `setGithubToken` helper, run that function once, then blank the literal back out of the source.
 
+### Dry Run (Manual Testing)
+
+Actions → **IIOSH Weekly Automation** → **Run workflow** → tick **dry_run**. The dashboard updates as usual (a full rewrite, safe to repeat) and the newsletter is generated with real AI summaries, but **no email is sent and nothing is published to Pages**. The log says `DRY RUN: email not sent (would have gone to N recipients)`, and the newsletter HTML is attached to the run as the `newsletter-preview` artifact. `dry_run` defaults to off, so the Apps Script trigger (which sends no inputs) always runs for real.
+
 ## License
 
 This project is maintained by Tamir Shelomi

@@ -1,7 +1,17 @@
 name: IIOSH Weekly Automation
+run-name: ${{ inputs.dry_run && 'IIOSH Weekly Automation (dry run)' || 'IIOSH Weekly Automation' }}
 
+# dry_run defaults to false, so the weekly Apps Script trigger (which sends no
+# inputs) runs for real. A dry run still updates the dashboard (a full rewrite,
+# safe to repeat) and builds the newsletter, but emails no one and publishes
+# nothing to Pages; the newsletter is attached to the run as an artifact instead.
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: no email, no Pages publish (newsletter attached to the run instead)'
+        type: boolean
+        default: false
 
 jobs:
   update-dashboard:
@@ -57,6 +67,7 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_LIST: ${{ secrets.RECIPIENT_LIST }}
+          DRY_RUN: ${{ inputs.dry_run }}
           PAGE_BASE_URL: 'https://tamirs-osh.github.io/OSH_Research'
           # Contact email for OpenAlex "polite pool" (reuses existing secret).
           OPENALEX_MAILTO: ${{ secrets.GMAIL_USER }}
@@ -80,8 +91,15 @@ jobs:
           cp "$latest" pages_output/index.html
           echo "produced=true" >> "$GITHUB_OUTPUT"
 
+      - name: Attach newsletter preview (dry run)
+        if: steps.prep.outputs.produced == 'true' && inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsletter-preview
+          path: pages_output/IIOSH_Research_Update_*.html
+
       - name: Deploy to GitHub Pages
-        if: steps.prep.outputs.produced == 'true'
+        if: steps.prep.outputs.produced == 'true' && !inputs.dry_run
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
