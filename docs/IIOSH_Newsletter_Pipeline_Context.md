@@ -19,7 +19,7 @@ The Israel Institute for Occupational Safety and Hygiene (IIOSH) utilizes an aut
 ## 🛡️ Core Pipeline Logic & Safeguards
 
 To prevent API throttling, token exhaustion, and email fatigue, the pipeline operates under strict editorial and engineering rules:
-1.  **The Q1 Gatekeeper:** The script strictly filters for high-impact journals designated as `"Grade": "Q1"` in the internal mapping dictionary.
+1.  **The Q1 Gatekeeper (tiered):** Each domain is filled from its `"Grade": "Q1"` journals first. Only when that yields `FALLBACK_THRESHOLD` (2) usable articles or fewer does it widen to the domain's Q1/Q2 journals, then Q2. Fallback slots are filled round-robin across journals (`interleave_by_journal()`) — one article from each journal in turn — so a single prolific journal such as JOEM can't take every slot. The per-domain cap is unchanged.
 2.  **Category Capping:** To prevent overwhelming the reader, the script caps processing at `MAX_ARTICLES_PER_SUBJECT = 5`. Once 5 valid articles with abstracts are processed for a domain (e.g., *Occupational Safety*), it skips remaining results for that category and moves on.
 3.  **Self-Healing Rate Limits:** * The script includes a forced `time.sleep(12)` between individual Gemini calls to respect the free-tier Requests-Per-Minute (RPM) limits.
     * It features an automatic 3-attempt retry loop that catches `503` (Server Busy) and `429` (Quota/Token Exceeded) errors, pausing for 15 seconds before retrying.

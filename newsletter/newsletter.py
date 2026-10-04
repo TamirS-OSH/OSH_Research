@@ -312,11 +312,24 @@ def gather_candidates(journal_entries, subject):
                 "link": work.get('doi', work.get('id')),
                 "abstract": raw_abstract,
                 "grade": grade,
+                "issn": issn,
             })
         if not_work_related:
             print(f"[DIAG] ISSN {issn} ({subject}): {not_work_related} article(s) dropped as not work-related.", flush=True)
         time.sleep(3)
     return candidates
+
+
+def interleave_by_journal(candidates):
+    """Round-robin across journals: each journal's newest article, then each
+    one's second-newest, and so on. Used for the fallback tier so one prolific
+    journal (e.g. JOEM) can't take every fallback slot. Changes only which
+    articles fill the slots, never how many."""
+    queues = {}
+    for cand in candidates:
+        queues.setdefault(cand["issn"], []).append(cand)
+    rounds = max((len(q) for q in queues.values()), default=0)
+    return [q[i] for i in range(rounds) for q in queues.values() if i < len(q)]
 
 
 def fetch_and_summarize():
@@ -347,7 +360,10 @@ def fetch_and_summarize():
 
         if len(candidates) <= FALLBACK_THRESHOLD and tier2[subject]:
             print(f"[DIAG] Domain '{subject}' at/under threshold ({FALLBACK_THRESHOLD}); widening to Q1/Q2 + Q2.", flush=True)
-            candidates += gather_candidates(tier2[subject], subject)
+            fallback = gather_candidates(tier2[subject], subject)
+            # Q1/Q2 journals still come ahead of pure Q2; round-robin within each.
+            candidates += interleave_by_journal([c for c in fallback if c["grade"] == "Q1/Q2"])
+            candidates += interleave_by_journal([c for c in fallback if c["grade"] != "Q1/Q2"])
         elif len(candidates) <= FALLBACK_THRESHOLD:
             print(f"[DIAG] Domain '{subject}' at/under threshold but has no lower-graded journals to fall back to.", flush=True)
 
