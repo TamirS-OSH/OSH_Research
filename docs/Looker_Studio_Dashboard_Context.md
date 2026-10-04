@@ -1,7 +1,7 @@
 # Context: IIOSH Journal Dashboard & Looker Studio Integration
 
 ## 📌 Project Overview
-The Israel Institute for Occupational Safety and Hygiene (IIOSH) is running an automated data pipeline to track, summarize, and visualize academic literature across **39 core target journals**. 
+The Israel Institute for Occupational Safety and Hygiene (IIOSH) is running an automated data pipeline to track, summarize, and visualize academic literature across **46 core target journals**. 
 
 The goal of this dashboard is to provide the IIOSH research team with a centralized repository of historical academic publications, filtered by subject domain and journal quality tiers.
 
@@ -20,7 +20,7 @@ The underlying data table fed into Looker Studio contains the following structur
 * `Journal Name`: The official display name of the publishing journal.
 * `DOI / ID Link`: Clickable URL linking directly to the full text on the publisher's site.
 * `Publication Date`: Year-Month-Day formatting to track historical trends.
-* `Subject Domain`: One of our specific internal IIOSH research categories (e.g., *Occupational Safety, Occupational Health, Occupational Hygiene, Musculoskeletal Health, Applied Psych & Org Behavior, Cognitive Ergonomics & HCI, General & Physical Ergonomics*).
+* `Subject Domain`: One of our specific internal IIOSH research categories (e.g., *Occupational Safety, Occupational Health, Occupational Hygiene, Musculoskeletal Health, Applied Psych & Org Behavior, Cognitive Ergonomics & HCI, General & Physical Ergonomics, Public & Environmental Health*).
 * `Grade`: The journal ranking metrics (**Q1** or **Q2**) mapped internally via specialized journal dictionaries.
 
 ---

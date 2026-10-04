@@ -1,5 +1,6 @@
 # Sensitive files
 credentials.json
+recipients*.txt
 
 # Python
 .venv/

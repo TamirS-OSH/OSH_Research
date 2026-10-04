@@ -68,8 +68,33 @@ JOURNAL_MAPPING = {
     "2168-2291": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
     "1044-7318": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
     "1436-6556": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1/Q2"}, 
-    "1520-6564": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q2"}
+    "1520-6564": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q2"},
+    "0962-7480": {"Subject": "Occupational Health", "Grade": "Q2"},  # Occupational Medicine
+    "0019-8366": {"Subject": "Occupational Health", "Grade": "Q2"},  # Industrial Health
+    "1048-2911": {"Subject": "Occupational Health", "Grade": "Q2"},  # New Solutions
+    # General (non-occupational) journals: "WorkFilter" keeps only articles
+    # that pass is_work_related(), otherwise this domain fills with general medicine.
+    "1323-7799": {"Subject": "Public & Environmental Health", "Grade": "Q1", "WorkFilter": True},  # Respirology
+    "0025-729X": {"Subject": "Public & Environmental Health", "Grade": "Q1", "WorkFilter": True},  # Medical Journal of Australia
+    "2667-2782": {"Subject": "Public & Environmental Health", "Grade": "Q1", "WorkFilter": True},  # J Climate Change and Health
+    "1326-0200": {"Subject": "Public & Environmental Health", "Grade": "Q2", "WorkFilter": True}   # ANZ J Public Health
 }
+
+# Work-relevance check for "WorkFilter" journals. Tuned against ~400 real 2026
+# abstracts from those journals: a single passing mention ("health workforce",
+# "tobacco industry") is noise, so an article qualifies only when a term is in
+# the title or appears at least WORK_TERMS_MIN_HITS times in the abstract.
+WORK_TERMS = re.compile(
+    r"\b(?:occupation(?:al|s)?(?!\s+therap)|workers?|workplaces?|work[- ]related|at work|"
+    r"work[- ]organi[sz]ational|employees?|employers?|employment|jobs?|"
+    r"working (?:conditions|hours|environments?|population)|shift ?work\w*|night shifts?|"
+    r"labourers|laborers|miners?|mining|farmworkers?|firefighters?|"
+    r"silica|silicosis|asbestos\w*|pneumoconios[ie]s|heat stress)\b", re.I)
+WORK_TERMS_MIN_HITS = 3
+
+
+def is_work_related(title, abstract):
+    return bool(WORK_TERMS.search(title)) or len(WORK_TERMS.findall(abstract)) >= WORK_TERMS_MIN_HITS
 
 # --- 2. HELPER FUNCTIONS ---
 def fetch_openalex(url, issn, subject, max_retries=4):
@@ -255,14 +280,15 @@ FALLBACK_THRESHOLD = 2
 def gather_candidates(journal_entries, subject):
     """Fetch + extract displayable article candidates from a list of journals.
 
-    journal_entries: list of (issn, grade) tuples to query, in priority order.
+    journal_entries: list of (issn, grade, work_filter) tuples to query, in priority order.
     Returns candidate dicts (title/journal/link/abstract/grade) preserving order.
     A candidate must have a usable abstract to count — that is the same gate the
-    display uses. AI summarization is deliberately deferred to the caller so we
-    don't spend Gemini calls on articles that end up trimmed by the per-domain cap.
+    display uses — and, for work_filter journals, must pass is_work_related().
+    AI summarization is deliberately deferred to the caller so we don't spend
+    Gemini calls on articles that end up trimmed by the per-domain cap.
     """
     candidates = []
-    for issn, grade in journal_entries:
+    for issn, grade, work_filter in journal_entries:
         url = f"https://api.openalex.org/works?filter=primary_location.source.issn:{issn},from_publication_date:{RECENT_DATE}&sort=publication_date:desc&per_page=15"
         if OPENALEX_MAILTO:
             url += f"&mailto={OPENALEX_MAILTO}"
@@ -272,9 +298,13 @@ def gather_candidates(journal_entries, subject):
             print(f"   ⚠️ Gave up on ISSN {issn} ({subject}) after retries. Skipping.", flush=True)
             continue
 
+        not_work_related = 0
         for work in response.json().get('results', []):
             raw_abstract = unscramble_abstract(work.get('abstract_inverted_index'))
             if not raw_abstract:
+                continue
+            if work_filter and not is_work_related(work.get('title') or "", raw_abstract):
+                not_work_related += 1
                 continue
             candidates.append({
                 "title": work.get('title', 'Untitled'),
@@ -283,6 +313,8 @@ def gather_candidates(journal_entries, subject):
                 "abstract": raw_abstract,
                 "grade": grade,
             })
+        if not_work_related:
+            print(f"[DIAG] ISSN {issn} ({subject}): {not_work_related} article(s) dropped as not work-related.", flush=True)
         time.sleep(3)
     return candidates
 
@@ -300,7 +332,7 @@ def fetch_and_summarize():
         if subject not in tier1:
             subjects_order.append(subject)
             tier1[subject], tier2[subject] = [], []
-        (tier1 if grade == "Q1" else tier2)[subject].append((issn, grade))
+        (tier1 if grade == "Q1" else tier2)[subject].append((issn, grade, info.get("WorkFilter", False)))
     for subject in tier2:
         tier2[subject].sort(key=lambda e: 0 if e[1] == "Q1/Q2" else 1)
 
