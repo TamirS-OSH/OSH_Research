@@ -67,7 +67,7 @@ JOURNAL_MAPPING = {
     "1071-5819": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
     "2168-2291": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
     "1044-7318": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1"}, 
-    "1436-6556": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1/Q2"}, 
+    "1435-5558": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q1/Q2"},  # Cognition, Technology & Work (was mistyped 1436-6556)
     "1520-6564": {"Subject": "Cognitive Ergonomics & HCI", "Grade": "Q2"},
     "0962-7480": {"Subject": "Occupational Health", "Grade": "Q2"},  # Occupational Medicine
     "0019-8366": {"Subject": "Occupational Health", "Grade": "Q2"},  # Industrial Health
@@ -322,9 +322,9 @@ def gather_candidates(journal_entries, subject):
 
 def interleave_by_journal(candidates):
     """Round-robin across journals: each journal's newest article, then each
-    one's second-newest, and so on. Used for the fallback tier so one prolific
-    journal (e.g. JOEM) can't take every fallback slot. Changes only which
-    articles fill the slots, never how many."""
+    one's second-newest, and so on. Applied within every tier so one prolific
+    journal (e.g. Safety Science, JOEM) can't take every slot. Changes only
+    which articles fill the slots, never how many."""
     queues = {}
     for cand in candidates:
         queues.setdefault(cand["issn"], []).append(cand)
@@ -355,7 +355,7 @@ def fetch_and_summarize():
 
     for subject in subjects_order:
         print(f"\n--- Domain: {subject} ---")
-        candidates = gather_candidates(tier1[subject], subject)
+        candidates = interleave_by_journal(gather_candidates(tier1[subject], subject))
         print(f"[DIAG] Domain '{subject}': {len(candidates)} usable Q1 article(s).", flush=True)
 
         if len(candidates) <= FALLBACK_THRESHOLD and tier2[subject]:

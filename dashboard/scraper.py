@@ -71,7 +71,7 @@ JOURNAL_MAPPING = {
     "1071-5819": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
     "2168-2291": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
     "1044-7318": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
-    "1436-6556": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
+    "1435-5558": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},  # Cognition, Technology & Work (was mistyped 1436-6556)
     "1520-6564": {"subject": "Cognitive Ergonomics & HCI", "grade": "Q1"},
 
     # Added Oct 2026 (grades from SJR 2024)
