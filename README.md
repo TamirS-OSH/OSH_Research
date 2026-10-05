@@ -59,7 +59,8 @@ docs/
   Looker_Studio_Dashboard_Context.md
   IIOSH_Newsletter_Pipeline_Context.md
 scripts_archive/           # Superseded scripts kept for reference
-HANDOVER.md                # Passing the automation to a new maintainer, plus maintenance and troubleshooting
+HANDOVER.md                # Passing the automation to a new maintainer, plus progress, maintenance and troubleshooting
+CLAUDE.md                  # Context for whoever picks this up next (human or Claude): where things live, easy-to-break rules, unfinished work
 ```
 
 ## Tech Stack

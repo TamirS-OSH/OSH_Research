@@ -8,15 +8,23 @@ How to pass this automation to a new maintainer so it keeps running after the de
 
 ## Progress
 
-**As of 2026-10-04 (evening):** Parts 1–4 have been worked through, and the account is renamed to `iiosh-research` (lowercase). **Next: Part 5 (weekly trigger), not started.** Open items, in order:
+**As of 2026-10-05:** Parts 1–9 are done. **What remains is Part 10: watching the first real run on Sunday 2026-10-11** and the follow-ups below. A new maintainer should also read [CLAUDE.md](CLAUDE.md).
 
-1. **Done:** the old trigger's URL reads `iiosh-research` (confirmed 2026-10-04). **Don't press Run in the old script.** With `triggerWeeklyNewsletter` selected it's a real send, and with `setGithubToken` selected it erases the saved token, which stops the Sunday run.
-2. **Done:** a dry run after the rename passed, with both jobs green (2026-10-05). The newsletter is at `iiosh-research.github.io/OSH_Research/`.
-3. **Done:** that dry run signed in as `journal-dashboard-bot@iiosh-automation.iam.gserviceaccount.com`, so the new project from Part 3 is in use (2026-10-05).
-4. **The Sheet was copied (Part 6, Plan B), confirmed 2026-10-05.** The copy is owned by `iiosh.news` and shared with the new service account; the job writes to it. The old Sheet is still in the departing maintainer's work account, with the old service account already removed. **Looker still reads the old Sheet, so the dashboard stops getting new articles until Part 7 is done.** **Looker was then copied (Part 7, Plan B), done 2026-10-05.** Transferring ownership was refused. The copy is owned by `iiosh.news`, and both embedded data sources were reconnected to the new Sheet. The new dashboard is `https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee`, updated in the README and in the newsletter's "Check the Literature Dashboard" button. The copy is shared as "Anyone with the link" (2026-10-05). Still to do: rename the copy (drop "Copy of"), tell the dashboard's users the new link, and optionally add a "moved to" note in the original.
-5. **Done:** the README and `newsletter.py` no longer mention `tamirs-osh` (Part 4, step 2).
-6. **Done: Part 5 (weekly trigger), 2026-10-05.** The new trigger is in `iiosh.news`, its token never expires, and the old trigger and old token are deleted. `testDryRun` started a dry run at 15:33 Israel time.
-7. **Next:** Part 8 (Gemini key), Part 9 (local files), then Part 10: watch the real run on Sunday 2026-10-11.
+**Done:**
+- **Part 1–2:** GitHub's email is now `iiosh.news@gmail.com`, and both accounts' passwords and 2FA have moved. A new Gmail app password is in place.
+- **Part 3:** new Cloud project `iiosh-automation`. Dry runs sign in as `journal-dashboard-bot@iiosh-automation.iam.gserviceaccount.com`, and the login is set to the lowercase `iiosh-research/OSH_Research`.
+- **Part 4:** the account is renamed to **`iiosh-research`** (lowercase). The newsletter is at `iiosh-research.github.io/OSH_Research/`, and the README and `newsletter.py` no longer mention `tamirs-osh`.
+- **Part 5:** the trigger is recreated in `iiosh.news` with a token that never expires. The old trigger and the old token are deleted.
+- **Part 6:** the Sheet was **copied** (Plan B; ownership transfer was refused). The copy in `iiosh.news` is shared with the new service account, and the old Sheet has no editors left.
+- **Part 7:** Looker was **copied** (Plan B; transfer refused). Both embedded data sources were reconnected to the new Sheet, and the copy is shared "anyone with the link". **New dashboard:** `https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee`, updated in the README and in the newsletter's "Check the Literature Dashboard" button.
+- **Part 8:** new Gemini key from `iiosh.news`, saved in `GEMINI_API_KEY`. A dry run with it was started on 2026-10-05.
+- **Part 9:** local files handed over. The repo folder, including the git-ignored `recipients.txt`, the journal-list `.docx` files and a `secrets.txt` with the account credentials, is copied to the organization's local server.
+
+**Still open:**
+1. **Sunday 2026-10-11, about 09:45 Israel time:** the first real run. Check it with the Part 10 list and CLAUDE.md → *What to check on Sunday*.
+2. **After it passes:** tighten the Google login to the new name only (Part 4, step 3).
+3. **Looker copy:** rename it (drop "Copy of") if not done, and tell the dashboard's users the new link. Optionally add a "moved to" note in the old report while the old account still exists.
+4. **Before the old account is deleted, if still possible:** delete the old Apps Script project, and remove the saved GitHub login from the old computer (Part 10, last list).
 
 ---
 
