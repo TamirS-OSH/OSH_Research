@@ -1,6 +1,6 @@
 # Research Automation
 
-Automated research monitoring pipeline for browsing occupational safety and hygiene literature. Tracks new academic publications across 46 target journals in occupational health, safety, ergonomics, and related fields — then delivers insights via a weekly newsletter ([Example](https://tamirs-osh.github.io/OSH_Research/IIOSH_Research_Update_2026-06-25.html)) and a live [Dashboard](https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2).
+Automated research monitoring pipeline for browsing occupational safety and hygiene literature. Tracks new academic publications across 46 target journals in occupational health, safety, ergonomics, and related fields — then delivers insights via a weekly newsletter ([Example](https://iiosh-research.github.io/OSH_Research/IIOSH_Research_Update_2026-06-25.html)) and a live [Dashboard](https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee).
 
 ## What It Does
 
@@ -11,7 +11,7 @@ A Python pipeline that runs every Sunday morning on GitHub Actions (triggered ex
    - **Article-level** — 2-sentence findings summary per paper
    - **Domain-level** — executive summary per research category
    - **Global-level** — master trend briefing with hyperlinks to individual articles
-3. Publishes the full interactive newsletter to [GitHub Pages](https://tamirs-osh.github.io/OSH_Research/)
+3. Publishes the full interactive newsletter to [GitHub Pages](https://iiosh-research.github.io/OSH_Research/)
 4. Sends a teaser email to the distribution list with the digest and a link to the full update
 
 ### Looker Studio Dashboard
@@ -110,7 +110,7 @@ The core of the Apps Script project:
 ```javascript
 function triggerWeeklyNewsletter() {
   var token = PropertiesService.getScriptProperties().getProperty('GITHUB_PAT');
-  var url = 'https://api.github.com/repos/TamirS-OSH/OSH_Research/actions/workflows/weekly_update.yml/dispatches';
+  var url = 'https://api.github.com/repos/iiosh-research/OSH_Research/actions/workflows/weekly_update.yml/dispatches';
   var options = {
     method: 'post',
     contentType: 'application/json',

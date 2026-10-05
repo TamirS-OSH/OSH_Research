@@ -10,7 +10,7 @@ from google import genai
 
 # --- 1. CONFIGURATION ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-PAGE_BASE_URL = os.environ.get("PAGE_BASE_URL", "https://tamirs-osh.github.io/OSH_Research")
+PAGE_BASE_URL = os.environ.get("PAGE_BASE_URL", "https://iiosh-research.github.io/OSH_Research")
 
 # EDITORIAL CONTROL: Maximum number of articles allowed per subject category
 MAX_ARTICLES_PER_SUBJECT = 5  
@@ -537,7 +537,7 @@ def build_email_body(global_meta, page_url):
     <div style="text-align: center; margin: 30px 0;">
         <a href="{page_url}" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #2563eb; text-decoration: none; border: 2px solid #2563eb; border-radius: 6px; font-weight: 700; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Read the Full Update  לקריאת הסקירה המלאה</a>
         <br><br>
-        <a href="https://datastudio.google.com/reporting/f82c0682-5cf7-4201-a9fb-907573f9fee2" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #15803d; text-decoration: none; border: 2px solid #15803d; border-radius: 6px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Check the Literature Dashboard  לבדיקת דשבורד הספרות המחקרית</a>
+        <a href="https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee" style="display: inline-block; padding: 12px 24px; background-color: #f8fafc; color: #15803d; text-decoration: none; border: 2px solid #15803d; border-radius: 6px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">Check the Literature Dashboard  לבדיקת דשבורד הספרות המחקרית</a>
     </div>
 
     <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 30px;">

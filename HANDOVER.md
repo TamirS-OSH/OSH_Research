@@ -13,7 +13,9 @@ How to pass this automation to a new maintainer so it keeps running after the de
 1. **Done:** the old trigger's URL reads `iiosh-research` (confirmed 2026-10-04). **Don't press Run in the old script.** With `triggerWeeklyNewsletter` selected it's a real send, and with `setGithubToken` selected it erases the saved token, which stops the Sunday run.
 2. **Done:** a dry run after the rename passed, with both jobs green (2026-10-05). The newsletter is at `iiosh-research.github.io/OSH_Research/`.
 3. **Done:** that dry run signed in as `journal-dashboard-bot@iiosh-automation.iam.gserviceaccount.com`, so the new project from Part 3 is in use (2026-10-05).
-4. **The Sheet was copied (Part 6, Plan B), confirmed 2026-10-05.** The copy is owned by `iiosh.news` and shared with the new service account; the job writes to it. The old Sheet is still in the departing maintainer's work account, with the old service account already removed. **Looker still reads the old Sheet, so the dashboard stops getting new articles until Part 7 is done.** In progress: sharing the Looker report with `iiosh.news` and checking whether ownership can be transferred, which would keep the dashboard link. If it can't, make a copy (Plan B).
+4. **The Sheet was copied (Part 6, Plan B), confirmed 2026-10-05.** The copy is owned by `iiosh.news` and shared with the new service account; the job writes to it. The old Sheet is still in the departing maintainer's work account, with the old service account already removed. **Looker still reads the old Sheet, so the dashboard stops getting new articles until Part 7 is done.** **Looker was then copied (Part 7, Plan B), done 2026-10-05.** Transferring ownership was refused. The copy is owned by `iiosh.news`, and both embedded data sources were reconnected to the new Sheet. The new dashboard is `https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee`, updated in the README and in the newsletter's "Check the Literature Dashboard" button. Still to do: rename the copy, match the original's sharing, tell the dashboard's users the new link, and optionally add a "moved to" note in the original.
+5. **Done:** the README and `newsletter.py` no longer mention `tamirs-osh` (Part 4, step 2).
+6. **Next: Part 5 (weekly trigger)**, then Parts 8–10.
 
 ---
 
@@ -260,7 +262,8 @@ The report reads the Sheet through **data sources**, at least two: the article t
 **Plan B — if the transfer is refused, or the Sheet was copied in Part 6:**
 - [ ] Successor, as `iiosh.news`: open the report → ⋮ → **Make a copy**. Looker offers new data sources; create them from the **new** Sheet (both tabs).
 - [ ] Check the copy shows the same record count and that filters work.
-- [ ] **The dashboard link changes.** Update it in [README.md](README.md) (top line) and tell the people who use it.
+- [ ] Rename the copy (drop "Copy of"), and give it the same sharing as the original: the same people, and the same link-sharing setting.
+- [ ] **The dashboard link changes.** Update it in [README.md](README.md) (top line) **and in `newsletter/newsletter.py`** (the "Check the Literature Dashboard" button in every email), and tell the people who use it.
 
 ## Part 8 — Gemini API key
 
@@ -279,7 +282,7 @@ These are git-ignored and exist nowhere else. Send them through an internal chan
 - [ ] The two journal-list Word files in the repo folder: `ירחונים לסקירה שוטפת מה חדש בתחומינו.docx` and `וכנסים רשימת_כתבי_עת_למעקב_שבועי_–_גרסה_נקייה.docx`.
 - [ ] **Not** `credentials.json`. It is an old login file the automation no longer uses. Delete it.
 
-**Unfinished work to know about:** branch `feat/occ-cancer-edition` holds a second newsletter edition for a researcher's occupational-cancer literature feed. It is not live. Its design and current state are in `docs/Occupational_Cancer_Edition_Plan.md` **on that branch**. `main` has moved on since, so merging needs manual reconciliation. The branch also still hardcodes the old `tamirs-osh` address and the old Cloud project in its workflow.
+**Unfinished work to know about:** branch `feat/occ-cancer-edition` holds a second newsletter edition for a researcher's occupational-cancer literature feed. It is not live. Its design and current state are in `docs/Occupational_Cancer_Edition_Plan.md` **on that branch**. `main` has moved on since, so merging needs manual reconciliation. The branch also still hardcodes the old `tamirs-osh` address, the old Cloud project in its workflow, and the old dashboard link.
 
 ## Part 10 — Verify
 
