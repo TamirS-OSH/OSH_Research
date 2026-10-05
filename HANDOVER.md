@@ -11,8 +11,8 @@ How to pass this automation to a new maintainer so it keeps running after the de
 **As of 2026-10-04 (evening):** Parts 1–4 have been worked through, and the account is renamed to `iiosh-research` (lowercase). **Next: Part 5 (weekly trigger), not started.** Open items, in order:
 
 1. **Done:** the old trigger's URL reads `iiosh-research` (confirmed 2026-10-04). **Don't press Run in the old script.** With `triggerWeeklyNewsletter` selected it's a real send, and with `setGithubToken` selected it erases the saved token, which stops the Sunday run.
-2. **No dry run has run since the rename and the Part 3 variables.** Run one ([Part 10](#part-10--verify)) and check both jobs are green.
-3. **Done, not yet tested:** the Google login in Part 3, step 4 was corrected to `iiosh-research/OSH_Research` in lowercase (2026-10-04). If the dry run's dashboard job fails at *Authenticate to Google Cloud*, re-check the attribute condition and the service account's *Workload Identity User* entry.
+2. **Done:** a dry run after the rename passed, with both jobs green (2026-10-05). The newsletter is at `iiosh-research.github.io/OSH_Research/`.
+3. **Confirm the dashboard job used the new project:** in that run's *Authenticate to Google Cloud* step, `service_account` should read `journal-dashboard-bot@iiosh-automation-…`, not `…@research-497406…`. If it shows the old one, the Part 3 variables aren't set.
 4. **Check which way the Sheet moved to `iiosh.news`** (Part 6). If the old `journal-dashboard-bot@research-497406…` service account appears in its Share dialog, ownership was transferred (Plan A). If not, it's a copy (Plan B), and the job and Looker are still using the old Sheet. Then do Part 7 to match.
 
 ---
