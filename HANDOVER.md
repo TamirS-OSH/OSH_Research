@@ -8,7 +8,7 @@ How to pass this automation to a new maintainer so it keeps running after the de
 
 ## Progress
 
-**As of 2026-10-05:** Parts 1–9 are done **except Part 8 (Gemini key), which is blocked. See open item 1.** **What remains is Part 10: watching the first real run on Sunday 2026-10-11** and the follow-ups below. A new maintainer should also read [CLAUDE.md](CLAUDE.md).
+**As of 2026-10-05:** Parts 1–9 are done **except Part 8 (Gemini key), which waits for the new analyst to put in a key from their own account. See open item 1.** **What remains is Part 10: watching the first real run on Sunday 2026-10-11** and the follow-ups below. A new maintainer should also read [CLAUDE.md](CLAUDE.md).
 
 **Done:**
 - **Part 1–2:** GitHub's email is now `iiosh.news@gmail.com`, and both accounts' passwords and 2FA have moved. A new Gmail app password is in place.
@@ -20,10 +20,13 @@ How to pass this automation to a new maintainer so it keeps running after the de
 - **Part 9:** local files handed over. The repo folder, including the git-ignored `recipients.txt`, the journal-list `.docx` files and a `secrets.txt` with the account credentials, is copied to the organization's local server.
 
 **Still open:**
-1. **Gemini key (Part 8), must be solved before the departing maintainer's work account is deleted.** Google refuses every key made in `iiosh.news` with *"Your project has been denied access"*. Three keys in two different projects (`iiosh-automation` and a new AI Studio project) were tested on 2026-10-05, and AI Studio shows their billing tier as *Unavailable*. The free tier isn't offered to that account, so a key from it only works once **billing is added**. Until then, `GEMINI_API_KEY` must hold the departing maintainer's free-tier key from `tamirs-google@osh.org.il` (project "Default Gemini Project"), **which stops working when that account is deleted**. Without a working key the newsletter still sends, but with "summary unavailable" instead of AI text. Options:
-   - **Recommended:** IIOSH links an institute billing account to a Gemini project in `iiosh.news` (Google Cloud → Billing), sets a budget alert (e.g. $5/month), creates a key there, and updates `GEMINI_API_KEY`. The expected cost is cents a month.
-   - A free-tier key from another institute Google account. That works, but makes the summaries depend on that person's account.
-   - To test a key without a full dry run, send one request to `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent` with the key in the `x-goog-api-key` header. HTTP 200 means it works.
+1. **Gemini key (Part 8): the new analyst replaces it with a key from their own Google account, before the departing maintainer's work account is deleted.** This was decided on 2026-10-05. `GEMINI_API_KEY` currently holds the departing maintainer's free-tier key from `tamirs-google@osh.org.il` (project "Default Gemini Project"), **which stops working when that account is deleted**. After that the newsletter still sends, but says "summary unavailable" instead of AI text. Keys from `iiosh.news` can't be used: Google refuses them (*"Your project has been denied access"*, billing tier *Unavailable*; 3 keys in 2 projects tested on 2026-10-05), because that account isn't eligible for the free tier. Steps for the new analyst:
+   1. Go to aistudio.google.com, signed in with **your own** Google account (e.g. your institute work account) → **Get API key** → **Create API key**. If asked for a project, let AI Studio create one.
+   2. In the key list, check that **Billing Tier** says **Free tier**. If it says *Unavailable*, your account isn't eligible either; ask IIOSH to add billing (see below).
+   3. Test the key without a full dry run by sending one request to `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent` with the key in the `x-goog-api-key` header. HTTP 200 means it works. A Claude session in this repo can do this for you.
+   4. GitHub → repo Settings → Secrets and variables → Actions → **`GEMINI_API_KEY` → Update**, paste, save. Update `secrets.txt` too.
+   - **This makes the summaries depend on your account,** so whoever takes over from you repeats these steps (see Maintenance → *Next handover*).
+   - **Alternative that doesn't depend on a person:** IIOSH links an institute billing account to a Gemini project in `iiosh.news` (Google Cloud → Billing), with a budget alert such as $5/month, then creates the key there. The expected cost is cents a month.
 2. **Sunday 2026-10-11, about 09:45 Israel time:** the first real run. Check it with the Part 10 list and CLAUDE.md → *What to check on Sunday*.
 3. **After it passes:** tighten the Google login to the new name only (Part 4, step 3).
 4. **Looker copy:** rename it (drop "Copy of") if not done, and tell the dashboard's users the new link. Optionally add a "moved to" note in the old report while the old account still exists.
@@ -282,7 +285,7 @@ The report reads the Sheet through **data sources**, at least two: the article t
 **Who: departing maintainer checks; successor replaces it if needed.**
 
 - [ ] Departing, signed in to the **personal** Google account: open aistudio.google.com → **Get API key**. If the key is listed there, it belongs to that account (possibly to the old Cloud project) and must be replaced. Note whether its plan says **Free** or **Paid**.
-- [ ] **Known as of 2026-10-05:** `iiosh.news` is **not eligible for the free tier**. Its keys show *Unavailable* and are refused with "Your project has been denied access", so link a billing account to the project first (Google Cloud → Billing), ideally with a budget alert.
+- [ ] **Known as of 2026-10-05:** `iiosh.news` is **not eligible for the free tier**. Its keys show *Unavailable* and are refused with "Your project has been denied access". **Decided: the maintainer uses a free-tier key from their own Google account instead** (see Progress, open item 1). Using `iiosh.news` would need a billing account linked first.
 - [ ] Successor, signed in as `iiosh.news`: aistudio.google.com → Get API key → **Create API key**. It can go in the `iiosh-automation` project from Part 3. If the old key was on a paid plan, set up billing for the new one too. Otherwise the free tier's limits may make summaries fail.
 - [ ] On GitHub → repo Settings → Secrets → **`GEMINI_API_KEY` → Update** with the new key.
 - [ ] Run a dry run and check that the email contains AI summaries.
@@ -328,7 +331,7 @@ These are git-ignored and exist nowhere else. Send them through an internal chan
 | Adding a journal | When needed | README → *Adding a Journal*. Four places, including the Sheet's Journal Metadata tab. |
 | Gemini model | If Google retires `gemini-3.1-flash-lite` (summaries fail with a "model not found" error) | Change the model name in `newsletter/newsletter.py` (3 places). |
 | Renaming the GitHub account again | Avoid if possible | First add the new name to the Google login (Part 3, step 4: the condition and a second Grant access), then repeat Part 4, and update the URL in the Apps Script. Links in emails already sent will break. |
-| Next handover | When the maintainer changes | Hand over `iiosh.news@gmail.com` (Part 2: recovery details, 2FA, password, new app password, forwarding), move GitHub's 2FA and password (Part 1, steps 2–4), then do Part 10. Everything else already lives on the two automation accounts. |
+| Next handover | When the maintainer changes | **The new maintainer replaces `GEMINI_API_KEY` with a free-tier key from their own Google account** (Progress, open item 1, steps 1–4) before the old maintainer's account goes. Then hand over `iiosh.news@gmail.com` (Part 2: recovery details, 2FA, password, new app password, forwarding), move GitHub's 2FA and password (Part 1, steps 2–4), then do Part 10. Everything else already lives on the two automation accounts. |
 
 ## Troubleshooting
 
