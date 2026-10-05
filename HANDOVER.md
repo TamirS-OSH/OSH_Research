@@ -17,7 +17,7 @@ How to pass this automation to a new maintainer so it keeps running after the de
 - **Part 5:** the trigger is recreated in `iiosh.news` with a token that never expires. The old trigger and the old token are deleted.
 - **Part 6:** the Sheet was **copied** (Plan B; ownership transfer was refused). The copy in `iiosh.news` is shared with the new service account, and the old Sheet has no editors left.
 - **Part 7:** Looker was **copied** (Plan B; transfer refused). Both embedded data sources were reconnected to the new Sheet, and the copy is shared "anyone with the link". **New dashboard:** `https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee`, updated in the README and in the newsletter's "Check the Literature Dashboard" button.
-- **Part 8:** new Gemini key from `iiosh.news`, saved in `GEMINI_API_KEY`. A dry run with it was started on 2026-10-05.
+- **Part 8:** new Gemini key from `iiosh.news`, saved in `GEMINI_API_KEY`. A dry run with it passed on 2026-10-05, with both jobs green.
 - **Part 9:** local files handed over. The repo folder, including the git-ignored `recipients.txt`, the journal-list `.docx` files and a `secrets.txt` with the account credentials, is copied to the organization's local server.
 
 **Still open:**
