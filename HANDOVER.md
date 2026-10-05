@@ -6,6 +6,15 @@ How to pass this automation to a new maintainer so it keeps running after the de
 
 > This repository is public. Never write passwords, tokens, recovery codes or the recipient list into this file or anywhere else in the repo.
 
+## First steps for the new analyst (do these before anything else)
+
+The handover in October 2026 left two gaps that only you can close:
+
+1. **Get into both automation accounts and make their 2FA yours.** The accounts are GitHub **`iiosh-research`** and Gmail **`iiosh.news@gmail.com`**. The git-ignored `secrets.txt` in the server copy of this folder has the Cloud project details and the trigger's token, but **may not have the account passwords or the 2FA recovery/backup codes**. If it doesn't, get them from IIOSH IT or the previous maintainer **before their accounts are deleted**. Then put 2FA on your own phone and generate new recovery codes (HANDOVER.md Part 1, step 3 and Part 2, step 2), and store them with IT. Without these, nobody can fix anything if a password or phone is lost.
+2. **Replace the Gemini key with one from your own Google account. Deadline: before the previous maintainer's account `tamirs-google@osh.org.il` is deleted.** The `GEMINI_API_KEY` secret still holds their personal free-tier key. Keys from `iiosh.news` don't work, because Google gives that account no free tier. If this is missed, the newsletter still goes out, but every summary reads *"summary unavailable"*. Steps: HANDOVER.md → Progress, open item 1.
+3. **Check that the weekly run works.** It runs on Sunday mornings; HANDOVER.md Part 10 has what to look for. The first real run after the handover is 2026-10-11.
+4. **Read "Rules that are easy to break" in [CLAUDE.md](CLAUDE.md)** before running anything. In particular, leaving `dry_run_email` empty in *Run workflow* emails every recipient.
+
 ## Progress
 
 **As of 2026-10-05:** Parts 1–9 are done **except Part 8 (Gemini key), which waits for the new analyst to put in a key from their own account. See open item 1.** **What remains is Part 10: watching the first real run on Sunday 2026-10-11** and the follow-ups below. A new maintainer should also read [CLAUDE.md](CLAUDE.md).

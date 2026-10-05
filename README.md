@@ -1,5 +1,7 @@
 # Research Automation
 
+> **New maintainer?** Start with [HANDOVER.md → First steps](HANDOVER.md#first-steps-for-the-new-analyst-do-these-before-anything-else). Two things need doing early: getting into the accounts, and putting in your own Gemini key.
+
 Automated research monitoring pipeline for browsing occupational safety and hygiene literature. Tracks new academic publications across 46 target journals in occupational health, safety, ergonomics, and related fields — then delivers insights via a weekly newsletter ([Example](https://iiosh-research.github.io/OSH_Research/IIOSH_Research_Update_2026-06-25.html)) and a live [Dashboard](https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee).
 
 ## What It Does
