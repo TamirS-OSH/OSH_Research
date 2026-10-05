@@ -99,37 +99,17 @@ Enable Pages in repo Settings → Pages → Deploy from branch → `gh-pages` / 
 
 GitHub Actions' native `schedule:` (cron) trigger proved **unreliable** for this repo — it never fired a single scheduled run despite a valid, active workflow on the default branch. Weekly execution is therefore driven **externally**:
 
-1. A **Google Apps Script** project (`IIOSH Weekly Trigger`, owned by the maintainer's Google account) runs on a time-driven **Week timer** trigger — Sunday morning, Israel time.
+1. A **Google Apps Script** project (`IIOSH Weekly Trigger`, owned by `iiosh.news@gmail.com`) runs on a time-driven **Week timer** trigger — Sunday morning, Israel time.
 2. The script reads a GitHub **fine-grained Personal Access Token** — stored in the project's Script Properties (never hardcoded), scoped to this repo only with `Actions: Read and write` — and sends a `POST` to GitHub's [`workflow_dispatch`](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event) endpoint for `weekly_update.yml`.
 3. GitHub then runs the workflow exactly as if the **Run workflow** button had been clicked.
 
 The workflow's `on:` block intentionally contains **only** `workflow_dispatch:` (no `schedule:`), so the Apps Script trigger is the single source of truth and there is no risk of a duplicate send if GitHub's own scheduler ever starts firing again.
 
-The core of the Apps Script project:
+The script's full code, and how to recreate it, are in [HANDOVER.md → Part 5](HANDOVER.md#part-5--weekly-trigger-apps-script). It has two functions:
+- `triggerWeeklyNewsletter`: what the weekly trigger runs. **A real send to everyone**, so never run it by hand.
+- `testDryRun`: sends a dry run to one address. Use this to test the trigger.
 
-```javascript
-function triggerWeeklyNewsletter() {
-  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_PAT');
-  var url = 'https://api.github.com/repos/iiosh-research/OSH_Research/actions/workflows/weekly_update.yml/dispatches';
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28'
-    },
-    payload: JSON.stringify({ ref: 'main' }),
-    muteHttpExceptions: true
-  };
-  var response = UrlFetchApp.fetch(url, options);
-  Logger.log(response.getResponseCode()); // 204 = success
-}
-```
-
-> **⚠️ Maintenance — the token expires.** Fine-grained GitHub PATs last up to ~1 year. When this one expires the Apps Script trigger will start failing and the newsletter will **silently stop going out**. To stay ahead of it:
-> - Enable the trigger's **failure-notification email** (Apps Script → Triggers → the trigger → *Notify me immediately*) so a lapse is caught early. This only fires if the function **throws** on a non-204 response. The snippet above only logs it, so use the version in [HANDOVER.md](HANDOVER.md#part-5--weekly-trigger-apps-script), which also adds a safe `testDryRun`.
-> - Before expiry, generate a fresh PAT (same scope), paste it into the `setGithubToken` helper, run that function once, then blank the literal back out of the source.
+A refused request makes the script throw, and the trigger has *Notify me immediately* on, so a failure emails `iiosh.news@gmail.com`. The token was created on 2026-10-05 with **no expiry**, so it only needs replacing if it's revoked or exposed (see HANDOVER.md → *Maintenance*).
 
 ### Dry Run (Manual Testing)
 

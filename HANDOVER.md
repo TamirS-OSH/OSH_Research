@@ -15,7 +15,8 @@ How to pass this automation to a new maintainer so it keeps running after the de
 3. **Done:** that dry run signed in as `journal-dashboard-bot@iiosh-automation.iam.gserviceaccount.com`, so the new project from Part 3 is in use (2026-10-05).
 4. **The Sheet was copied (Part 6, Plan B), confirmed 2026-10-05.** The copy is owned by `iiosh.news` and shared with the new service account; the job writes to it. The old Sheet is still in the departing maintainer's work account, with the old service account already removed. **Looker still reads the old Sheet, so the dashboard stops getting new articles until Part 7 is done.** **Looker was then copied (Part 7, Plan B), done 2026-10-05.** Transferring ownership was refused. The copy is owned by `iiosh.news`, and both embedded data sources were reconnected to the new Sheet. The new dashboard is `https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee`, updated in the README and in the newsletter's "Check the Literature Dashboard" button. The copy is shared as "Anyone with the link" (2026-10-05). Still to do: rename the copy (drop "Copy of"), tell the dashboard's users the new link, and optionally add a "moved to" note in the original.
 5. **Done:** the README and `newsletter.py` no longer mention `tamirs-osh` (Part 4, step 2).
-6. **Next: Part 5 (weekly trigger)**, then Parts 8–10.
+6. **Done: Part 5 (weekly trigger), 2026-10-05.** The new trigger is in `iiosh.news`, its token never expires, and the old trigger and old token are deleted. `testDryRun` started a dry run at 15:33 Israel time.
+7. **Next:** Part 8 (Gemini key), Part 9 (local files), then Part 10: watch the real run on Sunday 2026-10-11.
 
 ---
 
@@ -309,8 +310,8 @@ These are git-ignored and exist nowhere else. Send them through an internal chan
 
 | What | When | How |
 |---|---|---|
-| **GitHub token for the trigger** | **Expires on: ____________** (fill in at Part 5) | A few weeks before: make a new token with the same settings (Part 5, step 2), paste it into the Apps Script's `GITHUB_PAT` script property, run `testDryRun`, then delete the old token. **If it expires, the newsletter just stops**, and the only sign is the failure email. |
-| Sign in to `iiosh.news@gmail.com` | At least once a year, e.g. when renewing the token | Google deletes personal accounts that go unused for 2 years. |
+| **GitHub token for the trigger** | **Set to never expire** (created 2026-10-05). Replace it only if it's revoked or might have been exposed | Make a new token with the same settings (Part 5, step 2), paste it into the Apps Script's `GITHUB_PAT` script property, run `testDryRun`, then delete the old token. A revoked token shows as HTTP 401 in the trigger's failure email. |
+| Sign in to `iiosh.news@gmail.com` | At least once a year | Google deletes personal accounts that go unused for 2 years. |
 | Recipient list | When people join or leave | README → *GitHub Secrets Required*. |
 | Adding a journal | When needed | README → *Adding a Journal*. Four places, including the Sheet's Journal Metadata tab. |
 | Gemini model | If Google retires `gemini-3.1-flash-lite` (summaries fail with a "model not found" error) | Change the model name in `newsletter/newsletter.py` (3 places). |
