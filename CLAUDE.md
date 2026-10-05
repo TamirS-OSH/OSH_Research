@@ -17,7 +17,8 @@ Context for anyone, human or Claude, picking up this repo. The previous maintain
 | Dashboard data | Google Sheet **"IIOSH Dashboard Data"** in `iiosh.news`'s Drive. Tabs: `גיליון1` (articles, rewritten weekly) and `Journal Metadata` (maintained by hand) |
 | Dashboard | Looker Studio report `https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee`, owned by `iiosh.news`, shared "anyone with the link". Its two data sources are embedded in the report |
 | Weekly trigger | Apps Script **"IIOSH Weekly Trigger"** in `iiosh.news`. Fires Sunday morning, Israel time. Its GitHub token never expires |
-| GitHub secrets | `GEMINI_API_KEY` (key created in `iiosh.news`), `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `RECIPIENT_LIST` |
+| GitHub secrets | `GEMINI_API_KEY`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `RECIPIENT_LIST` |
+| **Gemini key — open problem** | Google refuses free-tier Gemini keys from `iiosh.news` ("project has been denied access", tier *Unavailable*), so that account needs **billing** before its keys work. Until then the secret holds the previous maintainer's free key from `tamirs-google@osh.org.il`, **which dies when that account is deleted**. See HANDOVER.md → Progress, open item 1 |
 | Passwords, recovery codes, 2FA | **Not in the repo.** They're in a git-ignored `secrets.txt` in the organization-server copy of this folder, and with IIOSH IT |
 | Recipient list source | git-ignored `newsletter/recipients.txt` (only in the server copy, not on GitHub) |
 

@@ -8,7 +8,7 @@ How to pass this automation to a new maintainer so it keeps running after the de
 
 ## Progress
 
-**As of 2026-10-05:** Parts 1–9 are done. **What remains is Part 10: watching the first real run on Sunday 2026-10-11** and the follow-ups below. A new maintainer should also read [CLAUDE.md](CLAUDE.md).
+**As of 2026-10-05:** Parts 1–9 are done **except Part 8 (Gemini key), which is blocked. See open item 1.** **What remains is Part 10: watching the first real run on Sunday 2026-10-11** and the follow-ups below. A new maintainer should also read [CLAUDE.md](CLAUDE.md).
 
 **Done:**
 - **Part 1–2:** GitHub's email is now `iiosh.news@gmail.com`, and both accounts' passwords and 2FA have moved. A new Gmail app password is in place.
@@ -17,14 +17,17 @@ How to pass this automation to a new maintainer so it keeps running after the de
 - **Part 5:** the trigger is recreated in `iiosh.news` with a token that never expires. The old trigger and the old token are deleted.
 - **Part 6:** the Sheet was **copied** (Plan B; ownership transfer was refused). The copy in `iiosh.news` is shared with the new service account, and the old Sheet has no editors left.
 - **Part 7:** Looker was **copied** (Plan B; transfer refused). Both embedded data sources were reconnected to the new Sheet, and the copy is shared "anyone with the link". **New dashboard:** `https://datastudio.google.com/reporting/b69400b8-a132-4605-a1f9-e37d0e2ca3ee`, updated in the README and in the newsletter's "Check the Literature Dashboard" button.
-- **Part 8:** new Gemini key from `iiosh.news`, saved in `GEMINI_API_KEY`. A dry run with it passed on 2026-10-05, with both jobs green.
 - **Part 9:** local files handed over. The repo folder, including the git-ignored `recipients.txt`, the journal-list `.docx` files and a `secrets.txt` with the account credentials, is copied to the organization's local server.
 
 **Still open:**
-1. **Sunday 2026-10-11, about 09:45 Israel time:** the first real run. Check it with the Part 10 list and CLAUDE.md → *What to check on Sunday*.
-2. **After it passes:** tighten the Google login to the new name only (Part 4, step 3).
-3. **Looker copy:** rename it (drop "Copy of") if not done, and tell the dashboard's users the new link. Optionally add a "moved to" note in the old report while the old account still exists.
-4. **Before the old account is deleted, if still possible:** delete the old Apps Script project, and remove the saved GitHub login from the old computer (Part 10, last list).
+1. **Gemini key (Part 8), must be solved before the departing maintainer's work account is deleted.** Google refuses every key made in `iiosh.news` with *"Your project has been denied access"*. Three keys in two different projects (`iiosh-automation` and a new AI Studio project) were tested on 2026-10-05, and AI Studio shows their billing tier as *Unavailable*. The free tier isn't offered to that account, so a key from it only works once **billing is added**. Until then, `GEMINI_API_KEY` must hold the departing maintainer's free-tier key from `tamirs-google@osh.org.il` (project "Default Gemini Project"), **which stops working when that account is deleted**. Without a working key the newsletter still sends, but with "summary unavailable" instead of AI text. Options:
+   - **Recommended:** IIOSH links an institute billing account to a Gemini project in `iiosh.news` (Google Cloud → Billing), sets a budget alert (e.g. $5/month), creates a key there, and updates `GEMINI_API_KEY`. The expected cost is cents a month.
+   - A free-tier key from another institute Google account. That works, but makes the summaries depend on that person's account.
+   - To test a key without a full dry run, send one request to `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent` with the key in the `x-goog-api-key` header. HTTP 200 means it works.
+2. **Sunday 2026-10-11, about 09:45 Israel time:** the first real run. Check it with the Part 10 list and CLAUDE.md → *What to check on Sunday*.
+3. **After it passes:** tighten the Google login to the new name only (Part 4, step 3).
+4. **Looker copy:** rename it (drop "Copy of") if not done, and tell the dashboard's users the new link. Optionally add a "moved to" note in the old report while the old account still exists.
+5. **Before the old account is deleted, if still possible:** delete the old Apps Script project, and remove the saved GitHub login from the old computer (Part 10, last list).
 
 ---
 
@@ -279,6 +282,7 @@ The report reads the Sheet through **data sources**, at least two: the article t
 **Who: departing maintainer checks; successor replaces it if needed.**
 
 - [ ] Departing, signed in to the **personal** Google account: open aistudio.google.com → **Get API key**. If the key is listed there, it belongs to that account (possibly to the old Cloud project) and must be replaced. Note whether its plan says **Free** or **Paid**.
+- [ ] **Known as of 2026-10-05:** `iiosh.news` is **not eligible for the free tier**. Its keys show *Unavailable* and are refused with "Your project has been denied access", so link a billing account to the project first (Google Cloud → Billing), ideally with a budget alert.
 - [ ] Successor, signed in as `iiosh.news`: aistudio.google.com → Get API key → **Create API key**. It can go in the `iiosh-automation` project from Part 3. If the old key was on a paid plan, set up billing for the new one too. Otherwise the free tier's limits may make summaries fail.
 - [ ] On GitHub → repo Settings → Secrets → **`GEMINI_API_KEY` → Update** with the new key.
 - [ ] Run a dry run and check that the email contains AI summaries.
